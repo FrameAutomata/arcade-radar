@@ -1,5 +1,11 @@
 import { distanceInMiles, type Coordinates } from '@/lib/geo';
-import type { Game, Venue, VenueInventoryItem, VenueMatch } from '@/types/domain';
+import type {
+  Game,
+  NearbyVenueResult,
+  Venue,
+  VenueInventoryItem,
+  VenueMatch,
+} from '@/types/domain';
 
 export const defaultUserLocation = {
   latitude: 41.9295,
@@ -265,6 +271,20 @@ export function findVenueMatches(
 
       return left.distanceMiles - right.distanceMiles;
     });
+}
+
+export function findNearbyVenues(
+  userLocation: Coordinates
+): NearbyVenueResult[] {
+  return [...venues]
+    .map((venue) => ({
+      venue,
+      distanceMiles: distanceInMiles(userLocation, {
+        latitude: venue.latitude,
+        longitude: venue.longitude,
+      }),
+    }))
+    .sort((left, right) => left.distanceMiles - right.distanceMiles);
 }
 
 function getStatusSortValue(status: VenueInventoryItem['status']): number {
