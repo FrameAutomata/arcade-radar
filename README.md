@@ -1,4 +1,4 @@
-# Arcade Aggregator
+# Arcade Radar
 
 Mobile-first Expo app for finding the nearest arcade that has the game you want.
 

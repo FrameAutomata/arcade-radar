@@ -16,7 +16,7 @@ function createMarkerIcon(isUserLocation: boolean) {
   const color = isUserLocation ? theme.colors.success : theme.colors.brand;
 
   return L.divIcon({
-    className: 'arcade-aggregator-marker',
+    className: 'arcade-radar-marker',
     html: `
       <div style="
         align-items:center;

@@ -1,8 +1,8 @@
 import type { ExpoConfig } from 'expo/config';
 
-const appName = 'Arcade Aggregator';
-const slug = 'arcade-aggregator';
-const bundleId = 'com.arcadeaggregator.mobile';
+const appName = 'Arcade Radar';
+const slug = 'arcade-radar';
+const bundleId = 'com.arcaderadar.mobile';
 const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 
 const config: ExpoConfig = {
@@ -52,7 +52,7 @@ const config: ExpoConfig = {
       'expo-location',
       {
         locationWhenInUsePermission:
-          'Arcade Aggregator uses your location to find the closest arcades carrying the game you want.',
+          'Arcade Radar uses your location to find the closest arcades carrying the game you want.',
       },
     ],
   ],
