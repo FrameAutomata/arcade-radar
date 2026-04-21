@@ -1,78 +1,71 @@
 import * as Location from 'expo-location';
 import { useDeferredValue, useMemo, useState, startTransition } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppMap } from '@/components/app-map';
 import { ResultCard } from '@/components/result-card';
 import { theme } from '@/constants/theme';
-import {
-  defaultUserLocation,
-  featuredGames,
-  findVenueMatches,
-  getGameById,
-  searchGames,
-  venues,
-} from '@/data/mock-data';
-import { formatVerificationAge } from '@/lib/format';
-import { buildMapRegion } from '@/lib/geo';
+import { defaultUserLocation, featuredGames, searchGames } from '@/data/mock-data';
 import { hasGoogleMapsApiKey, hasSupabaseCredentials } from '@/lib/env';
+import { formatDistanceMiles } from '@/lib/format';
+import { resolveAppLocation } from '@/lib/geocoding';
 import type { Coordinates } from '@/lib/geo';
-
-const demoLocationLabel = 'Logan Square demo location';
+import {
+  buildResultsModel,
+  demoLocationLabel,
+  resolveSelectedGame,
+} from '@/lib/search';
 
 export default function HomeScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const deferredQuery = useDeferredValue(searchQuery);
-  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= 1100;
   const [userLocation, setUserLocation] = useState<Coordinates>(defaultUserLocation);
   const [locationLabel, setLocationLabel] = useState(demoLocationLabel);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [manualLocationQuery, setManualLocationQuery] = useState('');
+  const [isApplyingManualLocation, setIsApplyingManualLocation] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const deferredQuery = useDeferredValue(searchQuery);
 
-  const suggestedGames = useMemo(
-    () => searchGames(deferredQuery),
-    [deferredQuery]
+  const suggestions = useMemo(() => searchGames(deferredQuery), [deferredQuery]);
+  const selectedGame = useMemo(
+    () => resolveSelectedGame(selectedGameId, searchQuery),
+    [searchQuery, selectedGameId]
+  );
+  const { game, mapRegion, results } = buildResultsModel(
+    selectedGame?.id ?? null,
+    userLocation
   );
 
-  const selectedGame = useMemo(() => {
-    if (!selectedGameId) {
-      return null;
-    }
-
-    return getGameById(selectedGameId) ?? null;
-  }, [selectedGameId]);
-
-  const results = useMemo(() => {
-    if (!selectedGame) {
-      return [];
-    }
-
-    return findVenueMatches(selectedGame.id, userLocation);
-  }, [selectedGame, userLocation]);
-
-  const mapVenues = selectedGame
-    ? results.map((result) => result.venue)
-    : venues;
-
-  const visibleMarkers = mapVenues.map((venue) => ({
-    latitude: venue.latitude,
-    longitude: venue.longitude,
-  }));
-
-  const mapKey = `${selectedGame?.id ?? 'all'}-${userLocation.latitude.toFixed(3)}-${userLocation.longitude.toFixed(3)}`;
-
-  const mapRegion = useMemo(
-    () => buildMapRegion(userLocation, visibleMarkers),
-    [userLocation, visibleMarkers]
-  );
+  const pins = [
+    {
+      id: 'user-location',
+      coordinate: userLocation,
+      isUserLocation: true,
+      title: 'You are here',
+    },
+    ...results.map((result) => ({
+      id: result.venue.id,
+      coordinate: {
+        latitude: result.venue.latitude,
+        longitude: result.venue.longitude,
+      },
+      description: `${result.venue.address}, ${result.venue.city}`,
+      title: result.venue.name,
+    })),
+  ];
 
   async function requestLocation() {
     setIsLocating(true);
@@ -102,6 +95,32 @@ export default function HomeScreen() {
     }
   }
 
+  async function applyManualLocation() {
+    const trimmedQuery = manualLocationQuery.trim();
+
+    if (!trimmedQuery) {
+      setLocationError('Enter an address or ZIP code to update the search area.');
+      return;
+    }
+
+    setIsApplyingManualLocation(true);
+    setLocationError(null);
+
+    try {
+      const manualLocation = await resolveAppLocation(trimmedQuery);
+
+      if (!manualLocation) {
+        setLocationError('Could not find that address or ZIP code yet.');
+        return;
+      }
+
+      setUserLocation(manualLocation.coordinates);
+      setLocationLabel(manualLocation.label);
+    } finally {
+      setIsApplyingManualLocation(false);
+    }
+  }
+
   function selectGame(gameId: string, title: string) {
     startTransition(() => {
       setSelectedGameId(gameId);
@@ -116,70 +135,29 @@ export default function HomeScreen() {
     });
   }
 
+  function clearFilter() {
+    startTransition(() => {
+      setSelectedGameId(null);
+      setSearchQuery('');
+    });
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, isWideLayout && styles.contentWide]}>
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Search a cabinet, not just an arcade</Text>
-          <Text style={styles.title}>Find the nearest spot carrying your game.</Text>
+          <Text style={styles.eyebrow}>Nearby first, game filter second</Text>
+          <Text style={styles.title}>Find arcades near you and filter the same map by game.</Text>
           <Text style={styles.description}>
-            This starter app ships with a local Chicago demo dataset and is wired for
-            Supabase + PostGIS once you add your backend keys.
+            The home screen now shows all nearby arcades by default. Pick a game to
+            narrow the same map and list without bouncing to another screen.
           </Text>
-        </View>
-
-        <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>What are you hunting for?</Text>
-          <TextInput
-            autoCapitalize="words"
-            autoCorrect={false}
-            onChangeText={updateSearch}
-            placeholder="Try Marvel vs. Capcom 2 or DDR"
-            placeholderTextColor={theme.colors.textMuted}
-            style={styles.input}
-            value={searchQuery}
-          />
-
-          <View style={styles.chipRow}>
-            {(searchQuery.trim() ? suggestedGames : featuredGames).map((game) => (
-              <Pressable
-                key={game.id}
-                onPress={() => selectGame(game.id, game.title)}
-                style={[
-                  styles.chip,
-                  selectedGame?.id === game.id && styles.chipSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.chipTitle,
-                    selectedGame?.id === game.id && styles.chipTitleSelected,
-                  ]}
-                >
-                  {game.title}
-                </Text>
-                <Text style={styles.chipMeta}>
-                  {game.manufacturer} • {game.releaseYear}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {selectedGame ? (
-            <Text style={styles.selectionText}>
-              Showing nearby matches for {selectedGame.title}.
-            </Text>
-          ) : (
-            <Text style={styles.selectionText}>
-              Pick a title above to see the nearest venues.
-            </Text>
-          )}
         </View>
 
         <View style={styles.panel}>
           <View style={styles.locationHeader}>
             <View style={styles.locationCopy}>
-              <Text style={styles.sectionTitle}>Where are you searching from?</Text>
+              <Text style={styles.sectionTitle}>Search your area</Text>
               <Text style={styles.locationText}>{locationLabel}</Text>
             </View>
             <Pressable
@@ -195,83 +173,134 @@ export default function HomeScreen() {
 
           {locationError ? <Text style={styles.warningText}>{locationError}</Text> : null}
 
-          <MapView initialRegion={mapRegion} key={mapKey} style={styles.map}>
-            <Marker coordinate={userLocation} title="You are here" />
-            {mapVenues.map((venue) => (
-              <Marker
-                key={venue.id}
-                coordinate={{
-                  latitude: venue.latitude,
-                  longitude: venue.longitude,
-                }}
-                description={selectedGame?.title ?? 'Demo venue'}
-                title={venue.name}
-              />
-            ))}
-          </MapView>
+          <View style={styles.manualLocationWrap}>
+            <TextInput
+              autoCapitalize="words"
+              autoCorrect={false}
+              onChangeText={setManualLocationQuery}
+              placeholder="Enter an address or ZIP code"
+              placeholderTextColor={theme.colors.textMuted}
+              style={styles.input}
+              value={manualLocationQuery}
+            />
+            <Pressable
+              disabled={isApplyingManualLocation}
+              onPress={applyManualLocation}
+              style={[
+                styles.secondaryButton,
+                isApplyingManualLocation && styles.secondaryButtonDisabled,
+              ]}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {isApplyingManualLocation ? 'Applying...' : 'Apply location'}
+              </Text>
+            </Pressable>
+          </View>
 
-          <View style={styles.factRow}>
-            <View style={styles.factCard}>
-              <Text style={styles.factValue}>{selectedGame ? results.length : venues.length}</Text>
-              <Text style={styles.factLabel}>
-                {selectedGame ? 'matching venues' : 'demo venues'}
-              </Text>
-            </View>
-            <View style={styles.factCard}>
-              <Text style={styles.factValue}>
-                {hasSupabaseCredentials ? 'Live' : 'Mock'}
-              </Text>
-              <Text style={styles.factLabel}>data source</Text>
-            </View>
-            <View style={styles.factCard}>
-              <Text style={styles.factValue}>
-                {hasGoogleMapsApiKey ? 'Ready' : 'Needed'}
-              </Text>
-              <Text style={styles.factLabel}>maps key</Text>
-            </View>
+          <Text style={styles.helperText}>
+            Try a street address or ZIP code like `60647`, `60513`, or `9415 Ogden Ave`.
+          </Text>
+
+          <View style={styles.filterHeader}>
+            <Text style={styles.sectionTitle}>Game filter</Text>
+            {game ? (
+              <Pressable onPress={clearFilter} style={styles.clearButton}>
+                <Text style={styles.clearButtonText}>All arcades</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <TextInput
+            autoCapitalize="words"
+            autoCorrect={false}
+            onChangeText={updateSearch}
+            placeholder="Search for a game like DDR or Marvel vs. Capcom 2"
+            placeholderTextColor={theme.colors.textMuted}
+            style={styles.input}
+            value={searchQuery}
+          />
+
+          <View style={styles.chipRow}>
+            {(searchQuery.trim() ? suggestions : featuredGames).map((suggestion) => (
+              <Pressable
+                key={suggestion.id}
+                onPress={() => selectGame(suggestion.id, suggestion.title)}
+                style={[
+                  styles.chip,
+                  Platform.OS === 'web' && styles.chipWeb,
+                  game?.id === suggestion.id && styles.chipSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.chipTitle,
+                    game?.id === suggestion.id && styles.chipTitleSelected,
+                  ]}
+                >
+                  {suggestion.title}
+                </Text>
+                <Text style={styles.chipMeta}>
+                  {suggestion.manufacturer} • {suggestion.releaseYear}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
-        <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>Nearest arcades</Text>
+        <View style={[styles.resultsGrid, isWideLayout && styles.resultsGridWide]}>
+          <View style={[styles.panel, styles.mapPanel, isWideLayout && styles.mapPanelWide]}>
+            <Text style={styles.sectionTitle}>Map</Text>
+            <AppMap height={isWideLayout ? 420 : 320} pins={pins} region={mapRegion} />
 
-          {selectedGame ? (
-            results.length > 0 ? (
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryValue}>{results.length}</Text>
+                <Text style={styles.summaryLabel}>
+                  {game ? 'matching arcades' : 'nearby arcades'}
+                </Text>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryValue}>
+                  {results[0] ? formatDistanceMiles(results[0].distanceMiles) : '--'}
+                </Text>
+                <Text style={styles.summaryLabel}>closest distance</Text>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryValue}>
+                  {hasSupabaseCredentials ? 'Live' : 'Mock'}
+                </Text>
+                <Text style={styles.summaryLabel}>data source</Text>
+              </View>
+            </View>
+
+            <Text style={styles.mapHint}>
+              {game
+                ? `Showing only arcades with ${game.title}.`
+                : 'Showing every nearby arcade in the demo data.'}
+            </Text>
+          </View>
+
+          <View style={[styles.panel, styles.listPanel, isWideLayout && styles.listPanelWide]}>
+            <View style={styles.listHeader}>
+              <Text style={styles.sectionTitle}>Arcades</Text>
+              <Text style={styles.listMeta}>
+                {hasGoogleMapsApiKey ? 'Maps ready' : 'Maps key needed for store builds'}
+              </Text>
+            </View>
+
+            {results.length > 0 ? (
               <View style={styles.resultsList}>
-                {results.map((match) => (
-                  <ResultCard key={match.venue.id} match={match} />
+                {results.map((result) => (
+                  <ResultCard key={result.venue.id} result={result} />
                 ))}
               </View>
             ) : (
               <Text style={styles.emptyText}>
-                No nearby matches in the demo data yet for that title.
+                {game
+                  ? 'No arcades in the demo data currently match this game near the selected location.'
+                  : 'No nearby arcades were found in the current demo data.'}
               </Text>
-            )
-          ) : (
-            <Text style={styles.emptyText}>
-              Search for a game to turn the list into real venue matches.
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>Backend wiring status</Text>
-          <View style={styles.statusList}>
-            <Text style={styles.statusLine}>
-              Supabase credentials: {hasSupabaseCredentials ? 'configured' : 'missing'}
-            </Text>
-            <Text style={styles.statusLine}>
-              Maps API key: {hasGoogleMapsApiKey ? 'configured' : 'missing for store builds'}
-            </Text>
-            <Text style={styles.statusLine}>
-              Schema target: games, venues, venue inventory, and community verification reports
-            </Text>
-            {selectedGame && results[0] ? (
-              <Text style={styles.statusLine}>
-                Best current match: {results[0].venue.name},{' '}
-                {formatVerificationAge(results[0].inventory.lastVerifiedAt)}
-              </Text>
-            ) : null}
+            )}
           </View>
         </View>
       </ScrollView>
@@ -288,6 +317,11 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
     padding: theme.spacing.md,
     paddingBottom: 48,
+  },
+  contentWide: {
+    alignSelf: 'center',
+    maxWidth: 1440,
+    width: '100%',
   },
   hero: {
     backgroundColor: theme.colors.surfaceStrong,
@@ -321,52 +355,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     padding: theme.spacing.md,
   },
-  sectionTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  input: {
-    backgroundColor: theme.colors.background,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    color: theme.colors.textPrimary,
-    fontSize: 16,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 14,
-  },
-  chipRow: {
-    gap: theme.spacing.sm,
-  },
-  chip: {
-    backgroundColor: theme.colors.surfaceMuted,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    gap: 4,
-    padding: theme.spacing.md,
-  },
-  chipSelected: {
-    borderColor: theme.colors.brand,
-    transform: [{ scale: 1.01 }],
-  },
-  chipTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  chipTitleSelected: {
-    color: theme.colors.brandMuted,
-  },
-  chipMeta: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-  },
-  selectionText: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-  },
   locationHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -376,6 +364,11 @@ const styles = StyleSheet.create({
   locationCopy: {
     flex: 1,
     gap: 4,
+  },
+  sectionTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
   },
   locationText: {
     color: theme.colors.textSecondary,
@@ -397,31 +390,145 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  map: {
-    borderRadius: theme.radius.md,
-    height: 240,
-    overflow: 'hidden',
-  },
-  factRow: {
-    flexDirection: 'row',
+  manualLocationWrap: {
     gap: theme.spacing.sm,
   },
-  factCard: {
+  filterHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  clearButton: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  clearButtonText: {
+    color: theme.colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  input: {
+    backgroundColor: theme.colors.background,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 14,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 12,
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.7,
+  },
+  secondaryButtonText: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  helperText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  chip: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    gap: 4,
+    padding: theme.spacing.md,
+  },
+  chipWeb: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 260,
+    minWidth: 220,
+  },
+  chipSelected: {
+    borderColor: theme.colors.brand,
+  },
+  chipTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  chipTitleSelected: {
+    color: theme.colors.brandMuted,
+  },
+  chipMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    flexWrap: 'wrap',
+  },
+  summaryCard: {
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.radius.sm,
     flex: 1,
     gap: 4,
     padding: theme.spacing.md,
   },
-  factValue: {
+  summaryValue: {
     color: theme.colors.textPrimary,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
   },
-  factLabel: {
+  summaryLabel: {
     color: theme.colors.textMuted,
     fontSize: 12,
     textTransform: 'uppercase',
+  },
+  mapHint: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+  },
+  resultsGrid: {
+    gap: theme.spacing.lg,
+  },
+  resultsGridWide: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+  },
+  mapPanel: {
+    width: '100%',
+  },
+  mapPanelWide: {
+    flex: 1.1,
+  },
+  listPanel: {
+    width: '100%',
+  },
+  listPanelWide: {
+    alignSelf: 'stretch',
+    flex: 0.9,
+  },
+  listHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  listMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
   },
   resultsList: {
     gap: theme.spacing.sm,
@@ -430,13 +537,5 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
-  },
-  statusList: {
-    gap: 8,
-  },
-  statusLine: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
   },
 });

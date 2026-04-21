@@ -32,6 +32,10 @@ Required before shipping store builds with Google Maps:
 
 - `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`
 
+For server-side geocoding with the Supabase Edge Function:
+
+- Set the Supabase secret `MAPBOX_ACCESS_TOKEN`
+
 ## Run The App
 
 ```bash
@@ -51,6 +55,28 @@ eas build --platform ios
 Run the SQL in `supabase/migrations/0001_initial_schema.sql` in the Supabase SQL editor, or use the Supabase CLI if you have it configured.
 
 Optional sample data lives in `supabase/seed.sql`.
+
+## Geocoding Setup
+
+Manual address and ZIP search is implemented through a Supabase Edge Function so the
+provider token stays off the client.
+
+1. Create a Mapbox access token with Search / Geocoding access.
+2. Set the Supabase secret:
+
+```bash
+npx supabase secrets set MAPBOX_ACCESS_TOKEN=your_token_here
+```
+
+3. Deploy the Edge Function:
+
+```bash
+npx supabase functions deploy geocode
+```
+
+Once your app has `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`, the
+manual location form will call that function. If the backend is not configured yet, the app
+falls back to a limited demo resolver for a few local test areas.
 
 ## What The Scaffold Includes
 

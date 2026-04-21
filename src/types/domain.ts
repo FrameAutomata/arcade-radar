@@ -40,3 +40,10 @@ export interface VenueMatch {
   venue: Venue;
   distanceMiles: number;
 }
+
+export interface NearbyVenueResult {
+  venue: Venue;
+  distanceMiles: number;
+  game?: Game;
+  inventory?: VenueInventoryItem;
+}

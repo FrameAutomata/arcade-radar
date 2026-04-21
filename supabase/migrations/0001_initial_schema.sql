@@ -12,6 +12,22 @@ begin
 end;
 $$;
 
+create or replace function public.set_game_search_text()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.search_text = lower(
+    btrim(
+      coalesce(new.title, '') || ' ' ||
+      coalesce(new.manufacturer, '') || ' ' ||
+      coalesce(array_to_string(new.aliases, ' '), '')
+    )
+  );
+  return new;
+end;
+$$;
+
 create table if not exists public.games (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
@@ -19,9 +35,7 @@ create table if not exists public.games (
   manufacturer text,
   release_year integer,
   aliases text[] not null default '{}',
-  search_text text generated always as (
-    lower(trim(both from concat_ws(' ', title, manufacturer, array_to_string(aliases, ' '))))
-  ) stored,
+  search_text text not null default '',
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
@@ -112,6 +126,10 @@ create index if not exists inventory_reports_status_idx
 create trigger set_games_updated_at
 before update on public.games
 for each row execute function public.set_updated_at();
+
+create trigger set_games_search_text
+before insert or update on public.games
+for each row execute function public.set_game_search_text();
 
 create trigger set_venues_updated_at
 before update on public.venues
