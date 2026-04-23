@@ -1,5 +1,11 @@
 import * as Location from "expo-location";
-import { useDeferredValue, useMemo, useState, startTransition } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  startTransition,
+} from "react";
 import {
   Platform,
   Pressable,
@@ -15,21 +21,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppMap } from "@/components/app-map";
 import { ResultCard } from "@/components/result-card";
 import { theme } from "@/constants/theme";
-import {
-  defaultUserLocation,
-  featuredGames,
-  searchGames,
-} from "@/data/mock-data";
+import { featuredGames as mockFeaturedGames } from "@/data/mock-data";
 import { hasSupabaseCredentials } from "@/lib/env";
 import { formatDistanceMiles } from "@/lib/format";
 import { resolveAppLocation } from "@/lib/geocoding";
-import type { Coordinates } from "@/lib/geo";
-import { openDirections } from "@/lib/navigation";
+import { buildMapRegion, type Coordinates } from "@/lib/geo";
 import {
-  buildResultsModel,
-  demoLocationLabel,
-  resolveSelectedGame,
-} from "@/lib/search";
+  defaultUserLocation,
+  findNearbyVenuesLive,
+  findVenueMatchesLive,
+  getFeaturedGamesLive,
+  searchGamesLive,
+} from "@/lib/live-data";
+import { openDirections } from "@/lib/navigation";
+import { demoLocationLabel } from "@/lib/search";
+import type { Game, NearbyVenueResult } from "@/types/domain";
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -44,22 +50,121 @@ export default function HomeScreen() {
   const [isApplyingManualLocation, setIsApplyingManualLocation] =
     useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+  const [featuredGames, setFeaturedGames] = useState<Game[]>(mockFeaturedGames);
+  const [suggestions, setSuggestions] = useState<Game[]>(mockFeaturedGames);
+  const [results, setResults] = useState<NearbyVenueResult[]>([]);
+  const [resultsError, setResultsError] = useState<string | null>(null);
+  const [isLoadingResults, setIsLoadingResults] = useState(true);
   const deferredQuery = useDeferredValue(searchQuery);
 
-  const suggestions = useMemo(
-    () => searchGames(deferredQuery),
-    [deferredQuery],
+  const game = selectedGame;
+  const mapRegion = useMemo(
+    () =>
+      buildMapRegion(
+        userLocation,
+        results.map((result) => ({
+          latitude: result.venue.latitude,
+          longitude: result.venue.longitude,
+        })),
+      ),
+    [results, userLocation],
   );
-  const selectedGame = useMemo(
-    () => resolveSelectedGame(selectedGameId, searchQuery),
-    [searchQuery, selectedGameId],
-  );
-  const { game, mapRegion, results } = buildResultsModel(
-    selectedGame?.id ?? null,
-    userLocation,
-  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFeaturedGames() {
+      try {
+        const nextFeaturedGames = await getFeaturedGamesLive();
+
+        if (!cancelled && nextFeaturedGames.length > 0) {
+          setFeaturedGames(nextFeaturedGames);
+          setSuggestions((currentSuggestions) =>
+            searchQuery.trim() ? currentSuggestions : nextFeaturedGames,
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setFeaturedGames(mockFeaturedGames);
+        }
+      }
+    }
+
+    void loadFeaturedGames();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSuggestions() {
+      const normalizedQuery = deferredQuery.trim();
+
+      if (!normalizedQuery) {
+        setSuggestions(featuredGames);
+        return;
+      }
+
+      try {
+        const nextSuggestions = await searchGamesLive(normalizedQuery);
+
+        if (!cancelled) {
+          setSuggestions(nextSuggestions);
+        }
+      } catch {
+        if (!cancelled) {
+          setSuggestions(featuredGames);
+        }
+      }
+    }
+
+    void loadSuggestions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deferredQuery, featuredGames]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadResults() {
+      setIsLoadingResults(true);
+      setResultsError(null);
+
+      try {
+        const nextResults = game
+          ? await findVenueMatchesLive(game, userLocation)
+          : await findNearbyVenuesLive(userLocation);
+
+        if (!cancelled) {
+          setResults(nextResults);
+        }
+      } catch {
+        if (!cancelled) {
+          setResults([]);
+          setResultsError(
+            "Could not load live arcade data yet. Check your Supabase schema and seed data.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingResults(false);
+        }
+      }
+    }
+
+    void loadResults();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [game, userLocation]);
 
   const pins = [
     {
@@ -162,23 +267,23 @@ export default function HomeScreen() {
     }
   }
 
-  function selectGame(gameId: string, title: string) {
+  function selectGame(game: Game) {
     startTransition(() => {
-      setSelectedGameId(gameId);
-      setSearchQuery(title);
+      setSelectedGame(game);
+      setSearchQuery(game.title);
     });
   }
 
   function updateSearch(value: string) {
     startTransition(() => {
       setSearchQuery(value);
-      setSelectedGameId(null);
+      setSelectedGame(null);
     });
   }
 
   function clearFilter() {
     startTransition(() => {
-      setSelectedGameId(null);
+      setSelectedGame(null);
       setSearchQuery("");
     });
   }
@@ -248,6 +353,9 @@ export default function HomeScreen() {
           {locationError ? (
             <Text style={styles.warningText}>{locationError}</Text>
           ) : null}
+          {resultsError ? (
+            <Text style={styles.warningText}>{resultsError}</Text>
+          ) : null}
 
           <View style={styles.manualLocationWrap}>
             <TextInput
@@ -302,7 +410,7 @@ export default function HomeScreen() {
               (suggestion) => (
                 <Pressable
                   key={suggestion.id}
-                  onPress={() => selectGame(suggestion.id, suggestion.title)}
+                  onPress={() => selectGame(suggestion)}
                   style={[
                     styles.chip,
                     Platform.OS === "web" && styles.chipWeb,
@@ -363,16 +471,18 @@ export default function HomeScreen() {
               </View>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryValue}>
-                  {hasSupabaseCredentials ? "Live" : "Mock"}
+                  {hasSupabaseCredentials ? "Supabase" : "Mock"}
                 </Text>
                 <Text style={styles.summaryLabel}>data source</Text>
               </View>
             </View>
 
             <Text style={styles.mapHint}>
-              {game
+              {isLoadingResults
+                ? "Loading nearby arcade data..."
+                : game
                 ? `Showing only arcades with ${game.title}.`
-                : "Showing every nearby arcade in the demo data."}
+                : "Showing every nearby arcade from the current data source."}
             </Text>
           </View>
 
@@ -388,7 +498,9 @@ export default function HomeScreen() {
               <Text style={styles.listMeta}>OpenStreetMap-based map view</Text>
             </View>
 
-            {results.length > 0 ? (
+            {isLoadingResults ? (
+              <Text style={styles.emptyText}>Loading arcades...</Text>
+            ) : results.length > 0 ? (
               <View style={styles.resultsList}>
                 {results.map((result) => (
                   <ResultCard
@@ -401,8 +513,8 @@ export default function HomeScreen() {
             ) : (
               <Text style={styles.emptyText}>
                 {game
-                  ? "No arcades in the demo data currently match this game near the selected location."
-                  : "No nearby arcades were found in the current demo data."}
+                  ? "No arcades currently match this game near the selected location."
+                  : "No nearby arcades were found for the selected location."}
               </Text>
             )}
           </View>

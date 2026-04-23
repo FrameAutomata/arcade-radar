@@ -172,6 +172,28 @@ export interface Database {
       };
     };
     Functions: {
+      find_nearest_venues: {
+        Args: {
+          user_lat: number;
+          user_lng: number;
+          max_distance_meters?: number;
+          result_limit?: number;
+        };
+        Returns: {
+          venue_id: string;
+          venue_name: string;
+          venue_slug: string;
+          street_address: string | null;
+          city: string;
+          region: string;
+          postal_code: string | null;
+          latitude: number;
+          longitude: number;
+          distance_meters: number;
+          last_verified_at: string | null;
+          tracked_game_count: number;
+        }[];
+      };
       search_games: {
         Args: {
           search_query: string;
@@ -209,6 +231,41 @@ export interface Database {
           availability_status: AvailabilityStatus;
           last_confirmed_at: string | null;
           confidence_score: number;
+        }[];
+      };
+      get_venue_details: {
+        Args: {
+          selected_venue_id: string;
+        };
+        Returns: {
+          venue_id: string;
+          venue_name: string;
+          venue_slug: string;
+          street_address: string | null;
+          city: string;
+          region: string;
+          postal_code: string | null;
+          country: string;
+          latitude: number;
+          longitude: number;
+          source: string;
+          venue_status: VenueStatus;
+          last_verified_at: string | null;
+          metadata: Record<string, unknown>;
+          verified_report_count: number;
+          game_id: string | null;
+          game_slug: string | null;
+          game_title: string | null;
+          manufacturer: string | null;
+          release_year: number | null;
+          aliases: string[] | null;
+          quantity: number | null;
+          availability_status: AvailabilityStatus | null;
+          machine_label: string | null;
+          notes: string | null;
+          confidence_score: number | null;
+          last_seen_at: string | null;
+          last_confirmed_at: string | null;
         }[];
       };
     };

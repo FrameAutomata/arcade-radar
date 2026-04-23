@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Platform,
   ScrollView,
@@ -10,13 +11,13 @@ import {
 
 import { AppMap } from "@/components/app-map";
 import { theme } from "@/constants/theme";
-import { getGameById, getVenueById } from "@/data/mock-data";
 import {
   formatDistanceMiles,
   formatVerificationAge,
   formatVerificationDate,
 } from "@/lib/format";
 import { distanceInMiles } from "@/lib/geo";
+import { getVenueDetailsLive, type VenueDetailsModel } from "@/lib/live-data";
 import { openDirections } from "@/lib/navigation";
 
 const fallbackLocation = {
@@ -41,7 +42,66 @@ export default function VenueDetailsScreen() {
   const { width } = useWindowDimensions();
   const isWideLayout = Platform.OS === "web" && width >= 1100;
   const params = useLocalSearchParams<{ id: string }>();
-  const venue = params.id ? getVenueById(params.id) : undefined;
+  const [venueDetails, setVenueDetails] = useState<VenueDetailsModel | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadVenue() {
+      if (!params.id) {
+        setVenueDetails(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const nextVenueDetails = await getVenueDetailsLive(params.id);
+
+        if (!cancelled) {
+          setVenueDetails(nextVenueDetails);
+        }
+      } catch {
+        if (!cancelled) {
+          setVenueDetails(null);
+          setLoadError(
+            "Could not load this venue from Supabase yet. Check the venue details RPC and seed data.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadVenue();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id]);
+
+  const venue = venueDetails?.venue;
+  const gamesById = venueDetails?.gamesById ?? {};
+
+  if (isLoading) {
+    return (
+      <View style={styles.missingState}>
+        <Stack.Screen options={{ title: "Loading venue" }} />
+        <Text style={styles.missingTitle}>Loading venue</Text>
+        <Text style={styles.missingText}>
+          Pulling the latest venue data from the current source.
+        </Text>
+      </View>
+    );
+  }
 
   if (!venue) {
     return (
@@ -49,8 +109,8 @@ export default function VenueDetailsScreen() {
         <Stack.Screen options={{ title: "Venue missing" }} />
         <Text style={styles.missingTitle}>Venue not found</Text>
         <Text style={styles.missingText}>
-          This route is wired up, but the current demo dataset does not contain
-          that venue id.
+          {loadError ??
+            "This route is wired up, but the current data source does not contain that venue id."}
         </Text>
       </View>
     );
@@ -154,7 +214,7 @@ export default function VenueDetailsScreen() {
             <Text style={styles.sectionTitle}>Tracked inventory</Text>
             <View style={styles.inventoryList}>
               {venue.inventory.map((item) => {
-                const game = getGameById(item.gameId);
+                const game = gamesById[item.gameId];
 
                 return (
                   <View
