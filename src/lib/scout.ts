@@ -33,6 +33,19 @@ interface PendingInventoryReport {
   submittedBy: string;
 }
 
+interface ApprovedInventoryReportResult {
+  reportId: string;
+  venueGameId: string;
+  resultingAvailabilityStatus: string;
+  resultingQuantity: number;
+}
+
+interface RejectedInventoryReportResult {
+  reportId: string;
+  reportStatus: Database['public']['Tables']['inventory_reports']['Row']['status'];
+  reviewedAt: string;
+}
+
 export type ScoutReportType =
   | 'confirmed_present'
   | 'missing'
@@ -159,4 +172,87 @@ export async function listPendingScoutReports(): Promise<PendingInventoryReport[
   }));
 }
 
-export type { PendingInventoryReport, ScoutVenue };
+export async function approveScoutInventoryReport(
+  reportId: string,
+): Promise<ApprovedInventoryReportResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'approve_inventory_report' as never,
+    {
+      selected_report_id: reportId,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        report_id: string;
+        venue_game_id: string;
+        resulting_availability_status: string;
+        resulting_quantity: number;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    reportId: firstRow.report_id,
+    resultingAvailabilityStatus: firstRow.resulting_availability_status,
+    resultingQuantity: firstRow.resulting_quantity,
+    venueGameId: firstRow.venue_game_id,
+  };
+}
+
+export async function rejectScoutInventoryReport(
+  reportId: string,
+  rejectionReason?: string,
+): Promise<RejectedInventoryReportResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'reject_inventory_report' as never,
+    {
+      selected_report_id: reportId,
+      rejection_reason: rejectionReason?.trim() || null,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        report_id: string;
+        report_status: Database['public']['Tables']['inventory_reports']['Row']['status'];
+        reviewed_at: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    reportId: firstRow.report_id,
+    reportStatus: firstRow.report_status,
+    reviewedAt: firstRow.reviewed_at,
+  };
+}
+
+export type {
+  ApprovedInventoryReportResult,
+  PendingInventoryReport,
+  RejectedInventoryReportResult,
+  ScoutVenue,
+};
