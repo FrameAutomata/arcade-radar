@@ -97,9 +97,10 @@ function mapNearbyVenue(row: NearbyVenueRow, userLocation: Coordinates): NearbyV
       latitude: row.latitude,
       longitude: row.longitude,
       name: row.venue_name,
+      notes: row.notes ?? undefined,
       region: row.region,
       slug: row.venue_slug,
-      verifiedByCount: 0,
+      verifiedByCount: row.verified_report_count,
     },
   };
 }

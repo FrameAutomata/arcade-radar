@@ -7,6 +7,7 @@ export type AvailabilityStatus =
   | 'removed';
 
 export type InventoryReportStatus = 'pending' | 'approved' | 'rejected';
+export type UserRole = 'scout' | 'admin';
 
 export interface Database {
   public: {
@@ -138,40 +139,79 @@ export interface Database {
       inventory_reports: {
         Row: {
           id: string;
-          venue_game_id: string;
+          venue_game_id: string | null;
           venue_id: string;
           game_id: string;
           user_id: string;
           report_type: string;
+          quantity: number;
+          machine_label: string | null;
           notes: string | null;
           status: InventoryReportStatus;
           reviewed_at: string | null;
           reviewed_by: string | null;
+          review_notes: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
-          venue_game_id: string;
+          venue_game_id?: string | null;
           venue_id: string;
           game_id: string;
           user_id: string;
           report_type: string;
+          quantity?: number;
+          machine_label?: string | null;
           notes?: string | null;
           status?: InventoryReportStatus;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
+          review_notes?: string | null;
           created_at?: string;
         };
         Update: {
+          venue_game_id?: string | null;
           report_type?: string;
+          quantity?: number;
+          machine_label?: string | null;
           notes?: string | null;
           status?: InventoryReportStatus;
           reviewed_at?: string | null;
           reviewed_by?: string | null;
+          review_notes?: string | null;
+        };
+      };
+      user_roles: {
+        Row: {
+          user_id: string;
+          role: UserRole;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          role: UserRole;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          role?: UserRole;
+          updated_at?: string;
         };
       };
     };
     Functions: {
+      approve_inventory_report: {
+        Args: {
+          selected_report_id: string;
+        };
+        Returns: {
+          report_id: string;
+          venue_game_id: string;
+          resulting_availability_status: string;
+          resulting_quantity: number;
+        }[];
+      };
       find_nearest_venues: {
         Args: {
           user_lat: number;
@@ -192,21 +232,8 @@ export interface Database {
           distance_meters: number;
           last_verified_at: string | null;
           tracked_game_count: number;
-        }[];
-      };
-      search_games: {
-        Args: {
-          search_query: string;
-          result_limit?: number;
-        };
-        Returns: {
-          game_id: string;
-          slug: string;
-          title: string;
-          manufacturer: string | null;
-          release_year: number | null;
-          aliases: string[];
-          similarity_score: number;
+          verified_report_count: number;
+          notes: string | null;
         }[];
       };
       find_nearest_venues_for_game: {
@@ -266,6 +293,66 @@ export interface Database {
           confidence_score: number | null;
           last_seen_at: string | null;
           last_confirmed_at: string | null;
+        }[];
+      };
+      list_pending_inventory_reports: {
+        Args: {
+          result_limit?: number;
+        };
+        Returns: {
+          report_id: string;
+          venue_game_id: string | null;
+          venue_id: string;
+          venue_name: string;
+          game_id: string;
+          game_title: string;
+          report_type: string;
+          quantity: number;
+          machine_label: string | null;
+          notes: string | null;
+          created_at: string;
+          submitted_by: string;
+        }[];
+      };
+      reject_inventory_report: {
+        Args: {
+          selected_report_id: string;
+          rejection_reason?: string | null;
+        };
+        Returns: {
+          report_id: string;
+          report_status: InventoryReportStatus;
+          reviewed_at: string;
+        }[];
+      };
+      search_games: {
+        Args: {
+          search_query: string;
+          result_limit?: number;
+        };
+        Returns: {
+          game_id: string;
+          slug: string;
+          title: string;
+          manufacturer: string | null;
+          release_year: number | null;
+          aliases: string[];
+          similarity_score: number;
+        }[];
+      };
+      submit_inventory_report: {
+        Args: {
+          selected_venue_id: string;
+          selected_game_id: string;
+          selected_report_type: string;
+          reported_quantity?: number;
+          reported_notes?: string | null;
+          reported_machine_label?: string | null;
+        };
+        Returns: {
+          report_id: string;
+          venue_game_id: string | null;
+          report_status: InventoryReportStatus;
         }[];
       };
     };

@@ -1,4 +1,5 @@
 import * as Location from "expo-location";
+import { Link } from "expo-router";
 import {
   useDeferredValue,
   useEffect,
@@ -16,6 +17,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import type { ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppMap } from "@/components/app-map";
@@ -60,6 +62,14 @@ export default function HomeScreen() {
   const deferredQuery = useDeferredValue(searchQuery);
 
   const game = selectedGame;
+  const scoutLinkStyle = StyleSheet.flatten([
+    styles.marqueePill,
+    styles.marqueePillAction,
+  ]) as ViewStyle;
+  const authLinkStyle = StyleSheet.flatten([
+    styles.marqueePill,
+    styles.marqueePillSecondary,
+  ]) as ViewStyle;
   const mapRegion = useMemo(
     () =>
       buildMapRegion(
@@ -306,6 +316,16 @@ export default function HomeScreen() {
               Retro signal, practical search
             </Text>
           </View>
+          <Link href="./scout" asChild>
+            <Pressable style={scoutLinkStyle}>
+              <Text style={styles.marqueeText}>Scout mode</Text>
+            </Pressable>
+          </Link>
+          <Link href="./auth" asChild>
+            <Pressable style={authLinkStyle}>
+              <Text style={styles.marqueeText}>Sign in</Text>
+            </Pressable>
+          </Link>
         </View>
 
         <View style={styles.hero}>
@@ -554,6 +574,9 @@ const styles = StyleSheet.create({
   },
   marqueePillSecondary: {
     borderColor: theme.colors.border,
+  },
+  marqueePillAction: {
+    borderColor: theme.colors.brand,
   },
   marqueeText: {
     color: theme.colors.accent,
