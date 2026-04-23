@@ -1,8 +1,8 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { theme } from '@/constants/theme';
+import { theme } from "@/constants/theme";
 
 export default function RootLayout() {
   return (
@@ -10,7 +10,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          animation: 'slide_from_right',
+          animation: "slide_from_right",
           contentStyle: { backgroundColor: theme.colors.background },
           headerShadowVisible: false,
           headerStyle: { backgroundColor: theme.colors.backgroundElevated },
@@ -18,15 +18,12 @@ export default function RootLayout() {
           headerTitleStyle: {
             color: theme.colors.textPrimary,
             fontSize: 18,
-            fontWeight: '700',
+            fontWeight: "700",
           },
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="venue/[id]"
-          options={{ title: 'Venue details' }}
-        />
+        <Stack.Screen name="venue/[id]" options={{ title: "Venue details" }} />
       </Stack>
     </SafeAreaProvider>
   );

@@ -7,22 +7,22 @@ import {
   RasterSource,
   type CameraRef,
   type MapRef,
-} from '@maplibre/maplibre-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+} from "@maplibre/maplibre-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { AppMapProps } from '@/components/app-map.types';
-import { theme } from '@/constants/theme';
+import type { AppMapProps } from "@/components/app-map.types";
+import { theme } from "@/constants/theme";
 
 const MAP_STYLE = {
   version: 8 as const,
   sources: {},
   layers: [
     {
-      id: 'background',
-      type: 'background' as const,
+      id: "background",
+      type: "background" as const,
       paint: {
-        'background-color': '#08111d',
+        "background-color": "#08111d",
       },
     },
   ],
@@ -53,15 +53,15 @@ export function AppMap({
       region.latitudeDelta,
       region.longitude,
       region.longitudeDelta,
-    ]
+    ],
   );
 
   useEffect(() => {
     LogManager.onLog((event) => {
       if (
-        event.level === 'warn' &&
-        event.tag === 'Mbgl-HttpRequest' &&
-        event.message.includes('stream was reset: CANCEL')
+        event.level === "warn" &&
+        event.tag === "Mbgl-HttpRequest" &&
+        event.message.includes("stream was reset: CANCEL")
       ) {
         return true;
       }
@@ -80,7 +80,7 @@ export function AppMap({
   async function syncZoomLevel() {
     const nextZoom = await mapRef.current?.getZoom();
 
-    if (typeof nextZoom === 'number') {
+    if (typeof nextZoom === "number") {
       setZoomLevel(nextZoom);
     }
   }
@@ -127,9 +127,13 @@ export function AppMap({
           id="osm-raster-source"
           maxzoom={19}
           tileSize={256}
-          tiles={['https://tile.openstreetmap.org/{z}/{x}/{y}.png']}
+          tiles={["https://tile.openstreetmap.org/{z}/{x}/{y}.png"]}
         >
-          <Layer id="osm-raster-layer" source="osm-raster-source" type="raster" />
+          <Layer
+            id="osm-raster-layer"
+            source="osm-raster-source"
+            type="raster"
+          />
         </RasterSource>
 
         {pins.map((pin) => (
@@ -162,7 +166,10 @@ export function AppMap({
         <Pressable onPress={() => void adjustZoom(1)} style={styles.zoomButton}>
           <Text style={styles.zoomButtonText}>+</Text>
         </Pressable>
-        <Pressable onPress={() => void adjustZoom(-1)} style={styles.zoomButton}>
+        <Pressable
+          onPress={() => void adjustZoom(-1)}
+          style={styles.zoomButton}
+        >
           <Text style={styles.zoomButtonText}>-</Text>
         </Pressable>
       </View>
@@ -175,29 +182,29 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
     shadowColor: theme.colors.shadow,
     shadowOpacity: 0.28,
     shadowRadius: 14,
-    width: '100%',
+    width: "100%",
   },
   map: {
     flex: 1,
   },
   zoomControls: {
     gap: 8,
-    position: 'absolute',
+    position: "absolute",
     right: 12,
     top: 12,
   },
   zoomButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(6, 11, 22, 0.9)',
+    alignItems: "center",
+    backgroundColor: "rgba(6, 11, 22, 0.9)",
     borderColor: theme.colors.borderStrong,
     borderRadius: 12,
     borderWidth: 1,
     height: 40,
-    justifyContent: 'center',
+    justifyContent: "center",
     shadowColor: theme.colors.accent,
     shadowOpacity: 0.14,
     shadowRadius: 10,
@@ -206,15 +213,15 @@ const styles = StyleSheet.create({
   zoomButtonText: {
     color: theme.colors.accent,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: 24,
   },
   markerWrap: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 6,
   },
   dot: {
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: "rgba(255,255,255,0.4)",
     borderRadius: 999,
     borderWidth: 2,
     height: 18,
@@ -231,7 +238,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
   },
   label: {
-    backgroundColor: 'rgba(8, 15, 30, 0.94)',
+    backgroundColor: "rgba(8, 15, 30, 0.94)",
     borderColor: theme.colors.borderStrong,
     borderRadius: 10,
     borderWidth: 1,
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
   labelTitle: {
     color: theme.colors.textPrimary,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   labelText: {
     color: theme.colors.textSecondary,

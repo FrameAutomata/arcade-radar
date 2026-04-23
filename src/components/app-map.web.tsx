@@ -1,22 +1,22 @@
-import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import L from 'leaflet';
-import { MapContainer } from 'react-leaflet/MapContainer';
-import { Marker } from 'react-leaflet/Marker';
-import { Popup } from 'react-leaflet/Popup';
-import { TileLayer } from 'react-leaflet/TileLayer';
-import { useMap, useMapEvents } from 'react-leaflet/hooks';
+import { useEffect } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import L from "leaflet";
+import { MapContainer } from "react-leaflet/MapContainer";
+import { Marker } from "react-leaflet/Marker";
+import { Popup } from "react-leaflet/Popup";
+import { TileLayer } from "react-leaflet/TileLayer";
+import { useMap, useMapEvents } from "react-leaflet/hooks";
 
-import type { AppMapProps } from '@/components/app-map.types';
-import { theme } from '@/constants/theme';
+import type { AppMapProps } from "@/components/app-map.types";
+import { theme } from "@/constants/theme";
 
-import 'leaflet/dist/leaflet.css';
+import "leaflet/dist/leaflet.css";
 
 function createMarkerIcon(isUserLocation: boolean) {
   const color = isUserLocation ? theme.colors.success : theme.colors.brand;
 
   return L.divIcon({
-    className: 'arcade-radar-marker',
+    className: "arcade-radar-marker",
     html: `
       <div style="
         align-items:center;
@@ -40,9 +40,9 @@ function FitToPins({
   pins,
   region,
 }: {
-  onMapInteractionChange?: AppMapProps['onMapInteractionChange'];
-  pins: AppMapProps['pins'];
-  region: AppMapProps['region'];
+  onMapInteractionChange?: AppMapProps["onMapInteractionChange"];
+  pins: AppMapProps["pins"];
+  region: AppMapProps["region"];
 }) {
   const map = useMap();
 
@@ -53,7 +53,13 @@ function FitToPins({
     }
 
     const bounds = L.latLngBounds(
-      pins.map((pin) => [pin.coordinate.latitude, pin.coordinate.longitude] as [number, number])
+      pins.map(
+        (pin) =>
+          [pin.coordinate.latitude, pin.coordinate.longitude] as [
+            number,
+            number,
+          ],
+      ),
     );
 
     map.fitBounds(bounds, {
@@ -91,7 +97,7 @@ export function AppMap({
           zoom={12}
         >
           <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
+            attribution="&copy; OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitToPins
@@ -115,7 +121,9 @@ export function AppMap({
                     <Text style={styles.popupSelected}>Selected arcade</Text>
                   ) : null}
                   {pin.description ? (
-                    <Text style={styles.popupDescription}>{pin.description}</Text>
+                    <Text style={styles.popupDescription}>
+                      {pin.description}
+                    </Text>
                   ) : null}
                 </View>
               </Popup>
@@ -126,13 +134,13 @@ export function AppMap({
 
       <View style={styles.captionRow}>
         <View style={styles.captionCard}>
-          <Text style={styles.captionValue}>{pins.filter((pin) => !pin.isUserLocation).length}</Text>
+          <Text style={styles.captionValue}>
+            {pins.filter((pin) => !pin.isUserLocation).length}
+          </Text>
           <Text style={styles.captionLabel}>arcade pins</Text>
         </View>
         <View style={styles.captionCard}>
-          <Text style={styles.captionValue}>
-            {getDisplayAddress(pins)}
-          </Text>
+          <Text style={styles.captionValue}>{getDisplayAddress(pins)}</Text>
           <Text style={styles.captionLabel}>address</Text>
         </View>
       </View>
@@ -140,35 +148,37 @@ export function AppMap({
   );
 }
 
-function getDisplayAddress(pins: AppMapProps['pins']): string {
-  const firstVenuePin = pins.find((pin) => !pin.isUserLocation && pin.description);
+function getDisplayAddress(pins: AppMapProps["pins"]): string {
+  const firstVenuePin = pins.find(
+    (pin) => !pin.isUserLocation && pin.description,
+  );
 
   if (firstVenuePin?.description) {
     return firstVenuePin.description;
   }
 
-  return 'Address unavailable';
+  return "Address unavailable";
 }
 
 const styles = StyleSheet.create({
   wrapper: {
     gap: theme.spacing.md,
-    width: '100%',
+    width: "100%",
   },
   mapFrame: {
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     borderWidth: 1,
-    overflow: 'hidden',
-    width: '100%',
+    overflow: "hidden",
+    width: "100%",
   },
   map: {
-    height: '100%',
-    width: '100%',
+    height: "100%",
+    width: "100%",
   },
   captionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.sm,
   },
   captionCard: {
@@ -182,29 +192,29 @@ const styles = StyleSheet.create({
   captionValue: {
     color: theme.colors.textPrimary,
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   captionLabel: {
     color: theme.colors.textMuted,
     fontSize: 12,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   popupContent: {
     gap: 4,
     maxWidth: 220,
   },
   popupTitle: {
-    color: '#0f172a',
+    color: "#0f172a",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   popupSelected: {
-    color: '#d97706',
+    color: "#d97706",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   popupDescription: {
-    color: '#334155',
+    color: "#334155",
     fontSize: 12,
     lineHeight: 18,
   },

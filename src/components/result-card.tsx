@@ -1,31 +1,31 @@
-import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ViewStyle } from 'react-native';
+import { Link } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { ViewStyle } from "react-native";
 
-import { theme } from '@/constants/theme';
-import { formatDistanceMiles, formatVerificationAge } from '@/lib/format';
-import type { NearbyVenueResult, VenueMatch } from '@/types/domain';
+import { theme } from "@/constants/theme";
+import { formatDistanceMiles, formatVerificationAge } from "@/lib/format";
+import type { NearbyVenueResult, VenueMatch } from "@/types/domain";
 
-function getStatusLabel(status: VenueMatch['inventory']['status']): string {
+function getStatusLabel(status: VenueMatch["inventory"]["status"]): string {
   switch (status) {
-    case 'confirmed_present':
-      return 'Confirmed';
-    case 'temporarily_unavailable':
-      return 'Maintenance';
-    case 'rumored_present':
-      return 'Rumored';
+    case "confirmed_present":
+      return "Confirmed";
+    case "temporarily_unavailable":
+      return "Maintenance";
+    case "rumored_present":
+      return "Rumored";
     default:
-      return 'Unknown';
+      return "Unknown";
   }
 }
 
-function getStatusColor(status: VenueMatch['inventory']['status']): string {
+function getStatusColor(status: VenueMatch["inventory"]["status"]): string {
   switch (status) {
-    case 'confirmed_present':
+    case "confirmed_present":
       return theme.colors.success;
-    case 'temporarily_unavailable':
+    case "temporarily_unavailable":
       return theme.colors.warning;
-    case 'rumored_present':
+    case "rumored_present":
       return theme.colors.brandMuted;
     default:
       return theme.colors.textMuted;
@@ -48,7 +48,7 @@ export function ResultCard({ result, selected = false }: ResultCardProps) {
   return (
     <Link
       href={{
-        pathname: '/venue/[id]',
+        pathname: "/venue/[id]",
         params: { id: result.venue.id },
       }}
       asChild
@@ -89,7 +89,7 @@ export function ResultCard({ result, selected = false }: ResultCardProps) {
               </View>
               <Text style={styles.metaText}>
                 {match.inventory.quantity} machine
-                {match.inventory.quantity > 1 ? 's' : ''}
+                {match.inventory.quantity > 1 ? "s" : ""}
               </Text>
               <Text style={styles.metaText}>
                 {formatVerificationAge(match.inventory.lastVerifiedAt)}
@@ -104,7 +104,7 @@ export function ResultCard({ result, selected = false }: ResultCardProps) {
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>
               {result.venue.inventory.length} tracked game
-              {result.venue.inventory.length === 1 ? '' : 's'}
+              {result.venue.inventory.length === 1 ? "" : "s"}
             </Text>
             <Text style={styles.metaText}>
               {result.venue.verifiedByCount} community confirmations
@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
   },
   row: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: theme.spacing.md,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   titleWrap: {
     flex: 1,
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   title: {
     color: theme.colors.textPrimary,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   subtitle: {
     color: theme.colors.textSecondary,
@@ -156,18 +156,18 @@ const styles = StyleSheet.create({
   gameTitle: {
     color: theme.colors.brandMuted,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.2,
   },
   distance: {
     color: theme.colors.brandMuted,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   metaRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.sm,
   },
   badge: {
@@ -177,9 +177,9 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   metaText: {
     color: theme.colors.textMuted,
