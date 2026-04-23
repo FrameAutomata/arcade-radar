@@ -1,6 +1,9 @@
 # Supabase
 .branches
 .temp
+seed.generated.sql
+seed-data/.geocode-cache.json
+seed-data/*.geocoded.csv
 
 # dotenvx
 .env.keys
