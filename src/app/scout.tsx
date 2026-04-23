@@ -10,8 +10,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
+import { getAuthSessionSummary } from '@/lib/auth';
 import {
+  approveScoutInventoryReport,
   getScoutSessionUser,
+  rejectScoutInventoryReport,
   listPendingScoutReports,
   listScoutVenues,
   searchScoutGames,
@@ -20,6 +23,7 @@ import {
   type ScoutReportType,
   type ScoutVenue,
 } from '@/lib/scout';
+import type { UserRole } from '@/types/database';
 import type { Game } from '@/types/domain';
 
 const REPORT_TYPES: Array<{
@@ -70,8 +74,11 @@ export default function ScoutScreen() {
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [sessionRole, setSessionRole] = useState<UserRole | null>(null);
   const [pendingReports, setPendingReports] = useState<PendingInventoryReport[]>([]);
   const [isLoadingQueue, setIsLoadingQueue] = useState(true);
+  const [queueMessage, setQueueMessage] = useState<string | null>(null);
+  const [activeModerationReportId, setActiveModerationReportId] = useState<string | null>(null);
 
   const filteredVenues = useMemo(() => {
     const normalizedQuery = venueQuery.trim().toLowerCase();
@@ -123,14 +130,19 @@ export default function ScoutScreen() {
       }
 
       try {
-        const user = await getScoutSessionUser();
+        const [user, authSummary] = await Promise.all([
+          getScoutSessionUser(),
+          getAuthSessionSummary(),
+        ]);
 
         if (!cancelled) {
           setSessionEmail(user?.email ?? null);
+          setSessionRole(authSummary?.role ?? null);
         }
       } catch {
         if (!cancelled) {
           setSessionEmail(null);
+          setSessionRole(null);
         }
       }
 
@@ -205,6 +217,44 @@ export default function ScoutScreen() {
     }
   }
 
+  async function approveReport(reportId: string) {
+    setActiveModerationReportId(reportId);
+    setQueueMessage(null);
+
+    try {
+      const result = await approveScoutInventoryReport(reportId);
+      await refreshPendingReports();
+      setQueueMessage(
+        result
+          ? `Report approved. Live inventory now reflects ${result.resultingAvailabilityStatus} with qty ${result.resultingQuantity}.`
+          : 'Report approved.',
+      );
+    } catch {
+      setQueueMessage(
+        'Approval failed. Confirm you are signed in with an admin account and try again.',
+      );
+    } finally {
+      setActiveModerationReportId(null);
+    }
+  }
+
+  async function rejectReport(reportId: string) {
+    setActiveModerationReportId(reportId);
+    setQueueMessage(null);
+
+    try {
+      await rejectScoutInventoryReport(reportId);
+      await refreshPendingReports();
+      setQueueMessage('Report rejected and removed from the pending queue.');
+    } catch {
+      setQueueMessage(
+        'Rejection failed. Confirm you are signed in with an admin account and try again.',
+      );
+    } finally {
+      setActiveModerationReportId(null);
+    }
+  }
+
   async function submitReport() {
     if (!selectedVenue || !selectedGame) {
       setSubmitMessage('Pick a venue and a game before submitting a scout report.');
@@ -275,6 +325,10 @@ export default function ScoutScreen() {
                 {sessionEmail ?? 'No session'}
               </Text>
               <Text style={styles.heroStatLabel}>current scout session</Text>
+            </View>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatValue}>{sessionRole ?? 'viewer'}</Text>
+              <Text style={styles.heroStatLabel}>current access role</Text>
             </View>
             <View style={styles.heroStat}>
               <Text style={styles.heroStatValue}>{pendingReports.length}</Text>
@@ -443,6 +497,16 @@ export default function ScoutScreen() {
                 <Text style={styles.secondaryButtonText}>Refresh</Text>
               </Pressable>
             </View>
+            {queueMessage ? <Text style={styles.helperMessage}>{queueMessage}</Text> : null}
+            {sessionRole === 'admin' ? (
+              <Text style={styles.helperText}>
+                Admin review is enabled. Approve a report to update live venue inventory, or reject it to clear the queue.
+              </Text>
+            ) : (
+              <Text style={styles.helperText}>
+                Pending reports are visible here. Sign in as an admin to approve or reject them from the app.
+              </Text>
+            )}
 
             {isLoadingQueue ? (
               <Text style={styles.emptyText}>Loading pending reports...</Text>
@@ -461,6 +525,35 @@ export default function ScoutScreen() {
                     </Text>
                     {report.notes ? (
                       <Text style={styles.queueNote}>{report.notes}</Text>
+                    ) : null}
+                    <Text style={styles.queueMeta}>Submitted by {report.submittedBy}</Text>
+                    {sessionRole === 'admin' ? (
+                      <View style={styles.queueActions}>
+                        <Pressable
+                          disabled={activeModerationReportId === report.reportId}
+                          onPress={() => void approveReport(report.reportId)}
+                          style={[
+                            styles.queueActionButton,
+                            styles.queueApproveButton,
+                            activeModerationReportId === report.reportId && styles.queueActionButtonDisabled,
+                          ]}
+                        >
+                          <Text style={styles.queueApproveButtonText}>
+                            {activeModerationReportId === report.reportId ? 'Working...' : 'Approve'}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={activeModerationReportId === report.reportId}
+                          onPress={() => void rejectReport(report.reportId)}
+                          style={[
+                            styles.queueActionButton,
+                            styles.queueRejectButton,
+                            activeModerationReportId === report.reportId && styles.queueActionButtonDisabled,
+                          ]}
+                        >
+                          <Text style={styles.queueRejectButtonText}>Reject</Text>
+                        </Pressable>
+                      </View>
                     ) : null}
                   </View>
                 ))}
@@ -770,6 +863,40 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 13,
     lineHeight: 18,
+  },
+  queueActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+  },
+  queueActionButton: {
+    alignItems: 'center',
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  queueActionButtonDisabled: {
+    opacity: 0.6,
+  },
+  queueApproveButton: {
+    backgroundColor: theme.colors.brand,
+    borderColor: theme.colors.brand,
+  },
+  queueApproveButtonText: {
+    color: theme.colors.textOnBrand,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  queueRejectButton: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.warning,
+  },
+  queueRejectButtonText: {
+    color: theme.colors.warning,
+    fontSize: 13,
+    fontWeight: '800',
   },
   emptyText: {
     color: theme.colors.textSecondary,
