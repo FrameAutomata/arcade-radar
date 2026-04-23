@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import L from 'leaflet';
 import { MapContainer } from 'react-leaflet/MapContainer';
 import { Marker } from 'react-leaflet/Marker';
 import { Popup } from 'react-leaflet/Popup';
 import { TileLayer } from 'react-leaflet/TileLayer';
-import { useMap } from 'react-leaflet/hooks';
+import { useMap, useMapEvents } from 'react-leaflet/hooks';
 
 import type { AppMapProps } from '@/components/app-map.types';
 import { theme } from '@/constants/theme';
@@ -36,15 +36,17 @@ function createMarkerIcon(isUserLocation: boolean) {
 }
 
 function FitToPins({
+  onMapInteractionChange,
   pins,
   region,
 }: {
+  onMapInteractionChange?: AppMapProps['onMapInteractionChange'];
   pins: AppMapProps['pins'];
   region: AppMapProps['region'];
 }) {
   const map = useMap();
 
-  useMemo(() => {
+  useEffect(() => {
     if (pins.length === 0) {
       map.setView([region.latitude, region.longitude], 12);
       return;
@@ -59,10 +61,26 @@ function FitToPins({
     });
   }, [map, pins, region.latitude, region.longitude]);
 
+  useMapEvents({
+    dragend: () => onMapInteractionChange?.(false),
+    dragstart: () => onMapInteractionChange?.(true),
+    movestart: () => onMapInteractionChange?.(true),
+    moveend: () => onMapInteractionChange?.(false),
+    zoomend: () => onMapInteractionChange?.(false),
+    zoomstart: () => onMapInteractionChange?.(true),
+  });
+
   return null;
 }
 
-export function AppMap({ pins, region, height = 320 }: AppMapProps) {
+export function AppMap({
+  pins,
+  region,
+  height = 320,
+  onMapInteractionChange,
+  onPinPress,
+  selectedPinId,
+}: AppMapProps) {
   return (
     <View style={styles.wrapper}>
       <View style={[styles.mapFrame, { height }]}>
@@ -76,16 +94,26 @@ export function AppMap({ pins, region, height = 320 }: AppMapProps) {
             attribution='&copy; OpenStreetMap contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <FitToPins pins={pins} region={region} />
+          <FitToPins
+            onMapInteractionChange={onMapInteractionChange}
+            pins={pins}
+            region={region}
+          />
           {pins.map((pin) => (
             <Marker
               key={pin.id}
               icon={createMarkerIcon(Boolean(pin.isUserLocation))}
+              eventHandlers={{
+                click: () => onPinPress?.(pin.id),
+              }}
               position={[pin.coordinate.latitude, pin.coordinate.longitude]}
             >
               <Popup>
                 <View style={styles.popupContent}>
                   <Text style={styles.popupTitle}>{pin.title}</Text>
+                  {selectedPinId === pin.id ? (
+                    <Text style={styles.popupSelected}>Selected arcade</Text>
+                  ) : null}
                   {pin.description ? (
                     <Text style={styles.popupDescription}>{pin.description}</Text>
                   ) : null}
@@ -168,6 +196,11 @@ const styles = StyleSheet.create({
   popupTitle: {
     color: '#0f172a',
     fontSize: 14,
+    fontWeight: '700',
+  },
+  popupSelected: {
+    color: '#d97706',
+    fontSize: 12,
     fontWeight: '700',
   },
   popupDescription: {

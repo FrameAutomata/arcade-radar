@@ -17,6 +17,7 @@ import {
   formatVerificationDate,
 } from "@/lib/format";
 import { distanceInMiles } from "@/lib/geo";
+import { openDirections } from "@/lib/navigation";
 
 const fallbackLocation = {
   latitude: 41.9295,
@@ -69,7 +70,17 @@ export default function VenueDetailsScreen() {
           isWideLayout && styles.contentWide,
         ]}
       >
+        <View style={styles.marqueeRow}>
+          <View style={styles.marqueePill}>
+            <Text style={styles.marqueeText}>Venue signal</Text>
+          </View>
+          <View style={[styles.marqueePill, styles.marqueePillSecondary]}>
+            <Text style={styles.marqueeText}>Tracked floor intelligence</Text>
+          </View>
+        </View>
+
         <View style={styles.hero}>
+          <View style={styles.heroGlow} />
           <Text style={styles.name}>{venue.name}</Text>
           <Text style={styles.address}>
             {venue.address}, {venue.city}, {venue.region}
@@ -103,6 +114,16 @@ export default function VenueDetailsScreen() {
             <Text style={styles.sectionTitle}>Map</Text>
             <AppMap
               height={isWideLayout ? 360 : 220}
+              onPinPress={() => {
+                void openDirections({
+                  address: `${venue.address}, ${venue.city}, ${venue.region}`,
+                  destination: {
+                    latitude: venue.latitude,
+                    longitude: venue.longitude,
+                  },
+                  label: `${venue.name}, ${venue.address}, ${venue.city}, ${venue.region}`,
+                });
+              }}
               pins={[
                 {
                   id: venue.id,
@@ -187,17 +208,57 @@ const styles = StyleSheet.create({
     maxWidth: 1440,
     width: "100%",
   },
+  marqueeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  marqueePill: {
+    backgroundColor: theme.colors.surfaceGlass,
+    borderColor: theme.colors.borderStrong,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  marqueePillSecondary: {
+    borderColor: theme.colors.border,
+  },
+  marqueeText: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
   hero: {
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surfaceGlass,
+    borderColor: theme.colors.borderStrong,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
     gap: theme.spacing.sm,
     padding: theme.spacing.lg,
+    overflow: "hidden",
+    position: "relative",
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+  },
+  heroGlow: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: 999,
+    height: 150,
+    opacity: 0.1,
+    position: "absolute",
+    right: -24,
+    top: -36,
+    width: 150,
   },
   name: {
     color: theme.colors.textPrimary,
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: "800",
-    lineHeight: 34,
+    lineHeight: 38,
   },
   address: {
     color: theme.colors.brandMuted,
@@ -215,7 +276,9 @@ const styles = StyleSheet.create({
   },
   metaCard: {
     backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
+    borderWidth: 1,
     flex: 1,
     gap: 4,
     padding: theme.spacing.md,
@@ -226,17 +289,22 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   metaLabel: {
-    color: theme.colors.textMuted,
+    color: theme.colors.accentMuted,
     fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   panel: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceGlass,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     gap: theme.spacing.md,
     padding: theme.spacing.md,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
   },
   sectionTitle: {
     color: theme.colors.textPrimary,
@@ -268,7 +336,9 @@ const styles = StyleSheet.create({
   },
   inventoryCard: {
     backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
+    borderWidth: 1,
     gap: 6,
     padding: theme.spacing.md,
   },

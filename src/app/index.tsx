@@ -20,6 +20,7 @@ import { hasSupabaseCredentials } from '@/lib/env';
 import { formatDistanceMiles } from '@/lib/format';
 import { resolveAppLocation } from '@/lib/geocoding';
 import type { Coordinates } from '@/lib/geo';
+import { openDirections } from '@/lib/navigation';
 import {
   buildResultsModel,
   demoLocationLabel,
@@ -29,6 +30,7 @@ import {
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 1100;
+  const [isMapInteracting, setIsMapInteracting] = useState(false);
   const [userLocation, setUserLocation] = useState<Coordinates>(defaultUserLocation);
   const [locationLabel, setLocationLabel] = useState(demoLocationLabel);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -37,6 +39,7 @@ export default function HomeScreen() {
   const [isApplyingManualLocation, setIsApplyingManualLocation] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(searchQuery);
 
   const suggestions = useMemo(() => searchGames(deferredQuery), [deferredQuery]);
@@ -66,6 +69,29 @@ export default function HomeScreen() {
       title: result.venue.name,
     })),
   ];
+
+  function handlePinPress(pinId: string) {
+    if (pinId === 'user-location') {
+      return;
+    }
+
+    setSelectedVenueId(pinId);
+
+    const tappedResult = results.find((result) => result.venue.id === pinId);
+
+    if (!tappedResult) {
+      return;
+    }
+
+    void openDirections({
+      address: `${tappedResult.venue.address}, ${tappedResult.venue.city}, ${tappedResult.venue.region}`,
+      destination: {
+        latitude: tappedResult.venue.latitude,
+        longitude: tappedResult.venue.longitude,
+      },
+      label: `${tappedResult.venue.name}, ${tappedResult.venue.address}, ${tappedResult.venue.city}`,
+    });
+  }
 
   async function requestLocation() {
     setIsLocating(true);
@@ -144,14 +170,40 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView contentContainerStyle={[styles.content, isWideLayout && styles.contentWide]}>
+      <ScrollView
+        contentContainerStyle={[styles.content, isWideLayout && styles.contentWide]}
+        scrollEnabled={Platform.OS === 'web' ? true : !isMapInteracting}
+      >
+        <View style={styles.marqueeRow}>
+          <View style={styles.marqueePill}>
+            <Text style={styles.marqueeText}>Arcade Radar</Text>
+          </View>
+          <View style={[styles.marqueePill, styles.marqueePillSecondary]}>
+            <Text style={styles.marqueeText}>Retro signal, practical search</Text>
+          </View>
+        </View>
+
         <View style={styles.hero}>
+          <View style={styles.heroGlow} />
           <Text style={styles.eyebrow}>Nearby first, game filter second</Text>
           <Text style={styles.title}>Find arcades near you and filter the same map by game.</Text>
           <Text style={styles.description}>
-            The home screen now shows all nearby arcades by default. Pick a game to
-            narrow the same map and list without bouncing to another screen.
+            Arcade Radar is built to feel fast and useful first, with just enough
+            retro-futurist energy to make every search feel like tuning into a lost
+            local signal from arcade culture.
           </Text>
+          <View style={styles.heroStats}>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatValue}>{results.length}</Text>
+              <Text style={styles.heroStatLabel}>visible arcades</Text>
+            </View>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatValue}>
+                {game ? game.title : 'All games'}
+              </Text>
+              <Text style={styles.heroStatLabel}>active filter</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.panel}>
@@ -250,7 +302,14 @@ export default function HomeScreen() {
         <View style={[styles.resultsGrid, isWideLayout && styles.resultsGridWide]}>
           <View style={[styles.panel, styles.mapPanel, isWideLayout && styles.mapPanelWide]}>
             <Text style={styles.sectionTitle}>Map</Text>
-            <AppMap height={isWideLayout ? 420 : 320} pins={pins} region={mapRegion} />
+            <AppMap
+              height={isWideLayout ? 420 : 320}
+              onMapInteractionChange={setIsMapInteracting}
+              onPinPress={handlePinPress}
+              pins={pins}
+              region={mapRegion}
+              selectedPinId={selectedVenueId}
+            />
 
             <View style={styles.summaryRow}>
               <View style={styles.summaryCard}>
@@ -289,7 +348,11 @@ export default function HomeScreen() {
             {results.length > 0 ? (
               <View style={styles.resultsList}>
                 {results.map((result) => (
-                  <ResultCard key={result.venue.id} result={result} />
+                  <ResultCard
+                    key={result.venue.id}
+                    result={result}
+                    selected={selectedVenueId === result.venue.id}
+                  />
                 ))}
               </View>
             ) : (
@@ -321,37 +384,105 @@ const styles = StyleSheet.create({
     maxWidth: 1440,
     width: '100%',
   },
+  marqueeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  marqueePill: {
+    backgroundColor: theme.colors.surfaceGlass,
+    borderColor: theme.colors.borderStrong,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  marqueePillSecondary: {
+    borderColor: theme.colors.border,
+  },
+  marqueeText: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
   hero: {
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surfaceGlass,
+    borderColor: theme.colors.borderStrong,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
     gap: theme.spacing.sm,
     padding: theme.spacing.lg,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroGlow: {
+    backgroundColor: theme.colors.highlight,
+    borderRadius: 999,
+    height: 160,
+    opacity: 0.12,
+    position: 'absolute',
+    right: -30,
+    top: -30,
+    width: 160,
   },
   eyebrow: {
     color: theme.colors.brandMuted,
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 1.8,
     textTransform: 'uppercase',
   },
   title: {
     color: theme.colors.textPrimary,
-    fontSize: 34,
+    fontSize: 40,
     fontWeight: '800',
-    lineHeight: 40,
+    lineHeight: 44,
   },
   description: {
     color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
   },
+  heroStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  heroStat: {
+    backgroundColor: 'rgba(8, 15, 30, 0.72)',
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    flexGrow: 1,
+    gap: 4,
+    minWidth: 180,
+    padding: theme.spacing.md,
+  },
+  heroStatValue: {
+    color: theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  heroStatLabel: {
+    color: theme.colors.accentMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
   panel: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceGlass,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     gap: theme.spacing.md,
     padding: theme.spacing.md,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
   },
   locationHeader: {
     alignItems: 'center',
@@ -367,6 +498,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: 20,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
   locationText: {
     color: theme.colors.textSecondary,
@@ -377,6 +509,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    shadowColor: theme.colors.brand,
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
   },
   locationButtonText: {
     color: theme.colors.textOnBrand,
@@ -408,7 +543,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   input: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.backgroundElevated,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
@@ -420,7 +555,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceMuted,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.accentMuted,
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     paddingHorizontal: theme.spacing.md,
@@ -459,6 +594,7 @@ const styles = StyleSheet.create({
     minWidth: 220,
   },
   chipSelected: {
+    backgroundColor: theme.colors.surfaceStrong,
     borderColor: theme.colors.brand,
   },
   chipTitle: {
@@ -481,6 +617,8 @@ const styles = StyleSheet.create({
   summaryCard: {
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.radius.sm,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
     flex: 1,
     gap: 4,
     padding: theme.spacing.md,
@@ -491,8 +629,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   summaryLabel: {
-    color: theme.colors.textMuted,
+    color: theme.colors.accentMuted,
     fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   mapHint: {
@@ -525,8 +665,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   listMeta: {
-    color: theme.colors.textMuted,
+    color: theme.colors.accentMuted,
     fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
   resultsList: {
     gap: theme.spacing.sm,

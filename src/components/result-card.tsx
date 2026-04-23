@@ -1,5 +1,6 @@
 import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 
 import { theme } from '@/constants/theme';
 import { formatDistanceMiles, formatVerificationAge } from '@/lib/format';
@@ -33,11 +34,16 @@ function getStatusColor(status: VenueMatch['inventory']['status']): string {
 
 interface ResultCardProps {
   result: NearbyVenueResult;
+  selected?: boolean;
 }
 
-export function ResultCard({ result }: ResultCardProps) {
+export function ResultCard({ result, selected = false }: ResultCardProps) {
   const match = result as VenueMatch;
   const hasGameDetails = Boolean(result.inventory && result.game);
+  const cardStyle = StyleSheet.flatten([
+    styles.card,
+    selected ? styles.cardSelected : null,
+  ]) as ViewStyle;
 
   return (
     <Link
@@ -47,7 +53,7 @@ export function ResultCard({ result }: ResultCardProps) {
       }}
       asChild
     >
-      <Pressable style={styles.card}>
+      <Pressable style={cardStyle}>
         <View style={styles.row}>
           <View style={styles.titleWrap}>
             <Text style={styles.title}>{result.venue.name}</Text>
@@ -112,12 +118,21 @@ export function ResultCard({ result }: ResultCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.surfaceGlass,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     gap: theme.spacing.sm,
     padding: theme.spacing.md,
+    shadowColor: theme.colors.shadow,
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+  },
+  cardSelected: {
+    borderColor: theme.colors.brand,
+    shadowColor: theme.colors.brand,
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
   },
   row: {
     alignItems: 'center',
@@ -142,6 +157,7 @@ const styles = StyleSheet.create({
     color: theme.colors.brandMuted,
     fontSize: 14,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
   distance: {
     color: theme.colors.brandMuted,
@@ -162,6 +178,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   metaText: {

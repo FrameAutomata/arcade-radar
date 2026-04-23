@@ -13,10 +13,11 @@ export default function RootLayout() {
           animation: 'slide_from_right',
           contentStyle: { backgroundColor: theme.colors.background },
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: theme.colors.surfaceStrong },
+          headerStyle: { backgroundColor: theme.colors.backgroundElevated },
           headerTintColor: theme.colors.textPrimary,
           headerTitleStyle: {
             color: theme.colors.textPrimary,
+            fontSize: 18,
             fontWeight: '700',
           },
         }}
