@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import L from "leaflet";
 import { MapContainer } from "react-leaflet/MapContainer";
@@ -38,17 +38,25 @@ function createMarkerIcon(isUserLocation: boolean) {
 function FitToPins({
   onMapInteractionChange,
   pins,
+  pinsSignature,
   region,
 }: {
   onMapInteractionChange?: AppMapProps["onMapInteractionChange"];
   pins: AppMapProps["pins"];
+  pinsSignature: string;
   region: AppMapProps["region"];
 }) {
   const map = useMap();
+  const lastAppliedSignature = useRef<string | null>(null);
 
   useEffect(() => {
+    if (lastAppliedSignature.current === pinsSignature) {
+      return;
+    }
+
     if (pins.length === 0) {
       map.setView([region.latitude, region.longitude], 12);
+      lastAppliedSignature.current = pinsSignature;
       return;
     }
 
@@ -65,7 +73,8 @@ function FitToPins({
     map.fitBounds(bounds, {
       padding: [36, 36],
     });
-  }, [map, pins, region.latitude, region.longitude]);
+    lastAppliedSignature.current = pinsSignature;
+  }, [map, pins, pinsSignature, region.latitude, region.longitude]);
 
   useMapEvents({
     dragend: () => onMapInteractionChange?.(false),
@@ -87,6 +96,19 @@ export function AppMap({
   onPinPress,
   selectedPinId,
 }: AppMapProps) {
+  const pinsSignature = useMemo(
+    () =>
+      JSON.stringify(
+        pins.map((pin) => ({
+          id: pin.id,
+          latitude: pin.coordinate.latitude,
+          longitude: pin.coordinate.longitude,
+          title: pin.title,
+        })),
+      ),
+    [pins],
+  );
+
   return (
     <View style={styles.wrapper}>
       <View style={[styles.mapFrame, { height }]}>
@@ -103,6 +125,7 @@ export function AppMap({
           <FitToPins
             onMapInteractionChange={onMapInteractionChange}
             pins={pins}
+            pinsSignature={pinsSignature}
             region={region}
           />
           {pins.map((pin) => (

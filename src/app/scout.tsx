@@ -11,9 +11,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
 import { getAuthSessionSummary } from '@/lib/auth';
+import { resolveAppLocation } from '@/lib/geocoding';
 import {
   approveScoutInventoryReport,
+  createScoutGame,
+  createScoutVenue,
   getScoutSessionUser,
+  getScoutErrorMessage,
   rejectScoutInventoryReport,
   listPendingScoutReports,
   listScoutVenues,
@@ -79,6 +83,21 @@ export default function ScoutScreen() {
   const [isLoadingQueue, setIsLoadingQueue] = useState(true);
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const [activeModerationReportId, setActiveModerationReportId] = useState<string | null>(null);
+  const [newVenueName, setNewVenueName] = useState('');
+  const [newVenueStreetAddress, setNewVenueStreetAddress] = useState('');
+  const [newVenueCity, setNewVenueCity] = useState('');
+  const [newVenueRegion, setNewVenueRegion] = useState('TX');
+  const [newVenuePostalCode, setNewVenuePostalCode] = useState('');
+  const [newVenueWebsite, setNewVenueWebsite] = useState('');
+  const [newVenueNotes, setNewVenueNotes] = useState('');
+  const [newVenueMessage, setNewVenueMessage] = useState<string | null>(null);
+  const [isCreatingVenue, setIsCreatingVenue] = useState(false);
+  const [newGameTitle, setNewGameTitle] = useState('');
+  const [newGameManufacturer, setNewGameManufacturer] = useState('');
+  const [newGameReleaseYear, setNewGameReleaseYear] = useState('');
+  const [newGameAliases, setNewGameAliases] = useState('');
+  const [newGameMessage, setNewGameMessage] = useState<string | null>(null);
+  const [isCreatingGame, setIsCreatingGame] = useState(false);
 
   const filteredVenues = useMemo(() => {
     const normalizedQuery = venueQuery.trim().toLowerCase();
@@ -217,6 +236,12 @@ export default function ScoutScreen() {
     }
   }
 
+  async function refreshScoutVenues() {
+    const nextVenues = await listScoutVenues();
+    setVenues(nextVenues);
+    return nextVenues;
+  }
+
   async function approveReport(reportId: string) {
     setActiveModerationReportId(reportId);
     setQueueMessage(null);
@@ -294,6 +319,142 @@ export default function ScoutScreen() {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function createVenueFromForm() {
+    if (!newVenueName.trim() || !newVenueStreetAddress.trim() || !newVenueCity.trim() || !newVenueRegion.trim()) {
+      setNewVenueMessage('Enter the venue name, street address, city, and region before saving.');
+      return;
+    }
+
+    setIsCreatingVenue(true);
+    setNewVenueMessage(null);
+
+    try {
+      const geocodeQuery = [
+        newVenueStreetAddress.trim(),
+        newVenueCity.trim(),
+        newVenueRegion.trim(),
+        newVenuePostalCode.trim(),
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      const resolvedLocation = await resolveAppLocation(geocodeQuery);
+
+      if (!resolvedLocation) {
+        setNewVenueMessage('Could not geocode that address yet. Double-check the address and try again.');
+        return;
+      }
+
+      const createdVenue = await createScoutVenue({
+        name: newVenueName,
+        streetAddress: newVenueStreetAddress,
+        city: newVenueCity,
+        country: 'US',
+        latitude: resolvedLocation.coordinates.latitude,
+        longitude: resolvedLocation.coordinates.longitude,
+        notes: newVenueNotes,
+        postalCode: newVenuePostalCode,
+        region: newVenueRegion,
+        website: newVenueWebsite,
+      });
+
+      if (!createdVenue) {
+        setNewVenueMessage('Venue creation did not return a saved venue. Try again.');
+        return;
+      }
+
+      const nextVenues = await refreshScoutVenues();
+      const matchedVenue =
+        nextVenues.find((venue) => venue.id === createdVenue.id) ??
+        {
+          address: createdVenue.address,
+          city: createdVenue.city,
+          id: createdVenue.id,
+          name: createdVenue.name,
+          region: createdVenue.region,
+          slug: createdVenue.slug,
+        };
+
+      setSelectedVenue(matchedVenue);
+      setVenueQuery(matchedVenue.name);
+      setNewVenueName('');
+      setNewVenueStreetAddress('');
+      setNewVenueCity('');
+      setNewVenueRegion('TX');
+      setNewVenuePostalCode('');
+      setNewVenueWebsite('');
+      setNewVenueNotes('');
+      setNewVenueMessage(`Saved ${createdVenue.name} and selected it for the next report.`);
+    } catch (error) {
+      const detail = getScoutErrorMessage(error);
+      setNewVenueMessage(`Could not create that venue yet: ${detail}`);
+    } finally {
+      setIsCreatingVenue(false);
+    }
+  }
+
+  async function createGameFromForm() {
+    if (!newGameTitle.trim()) {
+      setNewGameMessage('Enter the game title before saving.');
+      return;
+    }
+
+    const parsedReleaseYear = newGameReleaseYear.trim()
+      ? Number(newGameReleaseYear)
+      : null;
+
+    if (
+      parsedReleaseYear !== null &&
+      (!Number.isInteger(parsedReleaseYear) || parsedReleaseYear < 1970 || parsedReleaseYear > 2100)
+    ) {
+      setNewGameMessage('Release year must be a whole number between 1970 and 2100.');
+      return;
+    }
+
+    setIsCreatingGame(true);
+    setNewGameMessage(null);
+
+    try {
+      const createdGame = await createScoutGame({
+        aliases: newGameAliases
+          .split('|')
+          .map((alias) => alias.trim())
+          .filter(Boolean),
+        manufacturer: newGameManufacturer,
+        releaseYear: parsedReleaseYear,
+        title: newGameTitle,
+      });
+
+      if (!createdGame) {
+        setNewGameMessage('Game creation did not return a saved game. Try again.');
+        return;
+      }
+
+      const selectedCreatedGame: Game = {
+        id: createdGame.id,
+        slug: createdGame.slug,
+        title: createdGame.title,
+        manufacturer: createdGame.manufacturer,
+        releaseYear: createdGame.releaseYear,
+        aliases: createdGame.aliases,
+      };
+
+      setSelectedGame(selectedCreatedGame);
+      setGameQuery(selectedCreatedGame.title);
+      setGameResults((currentResults) => [selectedCreatedGame, ...currentResults]);
+      setNewGameTitle('');
+      setNewGameManufacturer('');
+      setNewGameReleaseYear('');
+      setNewGameAliases('');
+      setNewGameMessage(`Saved ${createdGame.title} and selected it for the next report.`);
+    } catch (error) {
+      const detail = getScoutErrorMessage(error);
+      setNewGameMessage(`Could not create that game yet: ${detail}`);
+    } finally {
+      setIsCreatingGame(false);
     }
   }
 
@@ -387,6 +548,82 @@ export default function ScoutScreen() {
                 ))}
               </View>
             ) : null}
+            {(sessionRole === 'admin' || sessionRole === 'scout') ? (
+              <View style={styles.subPanel}>
+                <Text style={styles.subPanelTitle}>Add a new venue</Text>
+                <Text style={styles.helperText}>
+                  If the arcade is missing, save it here and Scout Mode will geocode the address and add it to the active venue list.
+                </Text>
+                <TextInput
+                  onChangeText={setNewVenueName}
+                  placeholder="Venue name"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={styles.input}
+                  value={newVenueName}
+                />
+                <TextInput
+                  onChangeText={setNewVenueStreetAddress}
+                  placeholder="Street address"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={styles.input}
+                  value={newVenueStreetAddress}
+                />
+                <View style={styles.inlineFields}>
+                  <TextInput
+                    onChangeText={setNewVenueCity}
+                    placeholder="City"
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.inlineInput]}
+                    value={newVenueCity}
+                  />
+                  <TextInput
+                    autoCapitalize="characters"
+                    onChangeText={setNewVenueRegion}
+                    placeholder="State"
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.inlineInputSmall]}
+                    value={newVenueRegion}
+                  />
+                  <TextInput
+                    keyboardType="number-pad"
+                    onChangeText={setNewVenuePostalCode}
+                    placeholder="ZIP"
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.inlineInputSmall]}
+                    value={newVenuePostalCode}
+                  />
+                </View>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setNewVenueWebsite}
+                  placeholder="Website (optional)"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={styles.input}
+                  value={newVenueWebsite}
+                />
+                <TextInput
+                  multiline
+                  onChangeText={setNewVenueNotes}
+                  placeholder="Venue note (optional)"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={[styles.input, styles.notesInput]}
+                  value={newVenueNotes}
+                />
+                {newVenueMessage ? (
+                  <Text style={styles.helperMessage}>{newVenueMessage}</Text>
+                ) : null}
+                <Pressable
+                  disabled={isCreatingVenue}
+                  onPress={() => void createVenueFromForm()}
+                  style={[styles.secondaryButton, isCreatingVenue && styles.primaryButtonMuted]}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {isCreatingVenue ? 'Saving venue...' : 'Save new venue'}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <Text style={styles.sectionTitle}>2. Pick a game</Text>
             <TextInput
@@ -432,6 +669,57 @@ export default function ScoutScreen() {
                     </Text>
                   </Pressable>
                 ))}
+              </View>
+            ) : null}
+            {sessionRole === 'admin' ? (
+              <View style={styles.subPanel}>
+                <Text style={styles.subPanelTitle}>Add a new game</Text>
+                <Text style={styles.helperText}>
+                  Use this when a real cabinet is missing from the seeded catalog. Aliases should be pipe-separated, like `mvc2|marvel 2`.
+                </Text>
+                <TextInput
+                  onChangeText={setNewGameTitle}
+                  placeholder="Game title"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={styles.input}
+                  value={newGameTitle}
+                />
+                <View style={styles.inlineFields}>
+                  <TextInput
+                    onChangeText={setNewGameManufacturer}
+                    placeholder="Manufacturer"
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.inlineInput]}
+                    value={newGameManufacturer}
+                  />
+                  <TextInput
+                    keyboardType="number-pad"
+                    onChangeText={setNewGameReleaseYear}
+                    placeholder="Year"
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.inlineInputSmall]}
+                    value={newGameReleaseYear}
+                  />
+                </View>
+                <TextInput
+                  onChangeText={setNewGameAliases}
+                  placeholder="Aliases (pipe-separated)"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={styles.input}
+                  value={newGameAliases}
+                />
+                {newGameMessage ? (
+                  <Text style={styles.helperMessage}>{newGameMessage}</Text>
+                ) : null}
+                <Pressable
+                  disabled={isCreatingGame}
+                  onPress={() => void createGameFromForm()}
+                  style={[styles.secondaryButton, isCreatingGame && styles.primaryButtonMuted]}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {isCreatingGame ? 'Saving game...' : 'Save new game'}
+                  </Text>
+                </Pressable>
               </View>
             ) : null}
 
@@ -729,6 +1017,31 @@ const styles = StyleSheet.create({
   selectionMeta: {
     color: theme.colors.textSecondary,
     fontSize: 13,
+  },
+  subPanel: {
+    backgroundColor: 'rgba(8, 15, 30, 0.66)',
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    gap: theme.spacing.sm,
+    padding: theme.spacing.md,
+  },
+  subPanelTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  inlineFields: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  inlineInput: {
+    flex: 1,
+  },
+  inlineInputSmall: {
+    flexBasis: 92,
+    flexGrow: 0,
+    minWidth: 92,
   },
   notesInput: {
     minHeight: 100,

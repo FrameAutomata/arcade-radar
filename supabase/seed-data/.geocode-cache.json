@@ -1,0 +1,58 @@
+{
+  "cidercade-dallas": {
+    "latitude": 32.805817,
+    "longitude": -96.846625
+  },
+  "cidercade-arlington": {
+    "latitude": 32.738199,
+    "longitude": -97.102525
+  },
+  "cidercade-fort-worth": {
+    "latitude": 32.70741,
+    "longitude": -97.347171
+  },
+  "free-play-richardson": {
+    "latitude": 32.943835,
+    "longitude": -96.693302
+  },
+  "free-play-dallas": {
+    "latitude": 32.779934,
+    "longitude": -96.828156
+  },
+  "free-play-arlington": {
+    "latitude": 32.734429,
+    "longitude": -97.103137
+  },
+  "free-play-fort-worth": {
+    "latitude": 32.730131,
+    "longitude": -97.3331
+  },
+  "free-play-denton": {
+    "latitude": 33.214315,
+    "longitude": -97.132662
+  },
+  "round1-grapevine-mills": {
+    "latitude": 32.96617,
+    "longitude": -97.04241
+  },
+  "round1-arlington-parks": {
+    "latitude": 32.679339,
+    "longitude": -97.129592
+  },
+  "nickel-mania-carrollton": {
+    "latitude": 32.986717,
+    "longitude": -96.844003
+  },
+  "arcade-92-mckinney": {
+    "latitude": 33.198143,
+    "longitude": -96.612758
+  },
+  "arcade-92-flower-mound": {
+    "latitude": 32.991366,
+    "longitude": -97.063241
+  },
+  "electric-starship-arcade": {
+    "latitude": 32.848805,
+    "longitude": -97.263281
+  }
+}
