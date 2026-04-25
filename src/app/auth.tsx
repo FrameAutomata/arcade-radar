@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,8 @@ import {
 import { hasSupabaseCredentials } from '@/lib/env';
 
 export default function AuthScreen() {
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= 1100;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [session, setSession] = useState<AuthSessionSummary | null>(null);
@@ -42,7 +45,7 @@ export default function AuthScreen() {
       } catch {
         if (!cancelled) {
           setStatusMessage(
-            'Could not read the current auth session. Confirm your Supabase auth settings are ready.',
+            'Could not read the current account session. Try again in a moment.',
           );
         }
       } finally {
@@ -80,7 +83,7 @@ export default function AuthScreen() {
       );
     } catch {
       setStatusMessage(
-        'Sign-in failed. Double-check your email, password, and Supabase auth user setup.',
+        'Sign-in failed. Double-check your email and password.',
       );
     } finally {
       setIsSubmitting(false);
@@ -105,24 +108,19 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.marqueeRow}>
-          <View style={styles.marqueePill}>
-            <Text style={styles.marqueeText}>Auth</Text>
-          </View>
-          <View style={[styles.marqueePill, styles.marqueePillSecondary]}>
-            <Text style={styles.marqueeText}>Scout and admin access</Text>
-          </View>
-        </View>
-
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          isWideLayout && styles.contentWide,
+        ]}
+      >
         <View style={styles.hero}>
           <View style={styles.heroGlow} />
-          <Text style={styles.eyebrow}>Supabase session</Text>
-          <Text style={styles.title}>Sign in to unlock Scout Mode write access.</Text>
+          <Text style={styles.eyebrow}>Account</Text>
+          <Text style={styles.title}>Manage your Arcade Radar access.</Text>
           <Text style={styles.description}>
-            Use the same Supabase auth user that you assigned in `public.user_roles`.
-            Once signed in, Scout Mode can submit reports and, if your role is `admin`,
-            review queue actions can be enabled later.
+            Sign in to submit inventory reports, add venue details, and use
+            Scout Mode while you are out collecting arcade data.
           </Text>
         </View>
 
@@ -134,18 +132,17 @@ export default function AuthScreen() {
           ) : session ? (
             <View style={styles.sessionCard}>
               <Text style={styles.sessionValue}>{session.email ?? 'Signed-in user'}</Text>
-              <Text style={styles.sessionMeta}>Role: {session.role ?? 'none assigned'}</Text>
-              <Text style={styles.sessionMeta}>User ID: {session.userId}</Text>
+              <Text style={styles.sessionMeta}>Access: {session.role ?? 'viewer'}</Text>
             </View>
           ) : (
             <Text style={styles.helperText}>
-              No user session is active yet. Sign in below with your Supabase auth account.
+              No account is signed in yet.
             </Text>
           )}
 
           {!hasSupabaseCredentials ? (
             <Text style={styles.warningText}>
-              Supabase env vars are missing, so in-app auth cannot start yet.
+              Account sign-in is not configured for this build yet.
             </Text>
           ) : null}
 
@@ -157,8 +154,8 @@ export default function AuthScreen() {
             <>
               <Text style={styles.sectionTitle}>Signed in</Text>
               <Text style={styles.helperText}>
-                This device is already using your current Supabase session. You can
-                sign out below whenever you want to switch accounts.
+                You are signed in on this device. Sign out below whenever you
+                want to switch accounts.
               </Text>
               <Pressable
                 disabled={isSubmitting}
@@ -223,28 +220,10 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     paddingBottom: 48,
   },
-  marqueeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  marqueePill: {
-    backgroundColor: theme.colors.surfaceGlass,
-    borderColor: theme.colors.borderStrong,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  marqueePillSecondary: {
-    borderColor: theme.colors.border,
-  },
-  marqueeText: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+  contentWide: {
+    alignSelf: 'center',
+    maxWidth: 1440,
+    width: '100%',
   },
   hero: {
     backgroundColor: theme.colors.surfaceGlass,

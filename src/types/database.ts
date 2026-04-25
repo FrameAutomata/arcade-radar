@@ -20,6 +20,7 @@ export interface Database {
           manufacturer: string | null;
           release_year: number | null;
           aliases: string[];
+          categories: string[];
           created_at: string;
           updated_at: string;
         };
@@ -30,6 +31,7 @@ export interface Database {
           manufacturer?: string | null;
           release_year?: number | null;
           aliases?: string[];
+          categories?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -39,6 +41,7 @@ export interface Database {
           manufacturer?: string | null;
           release_year?: number | null;
           aliases?: string[];
+          categories?: string[];
           updated_at?: string;
         };
       };
@@ -212,6 +215,50 @@ export interface Database {
           resulting_quantity: number;
         }[];
       };
+      create_venue: {
+        Args: {
+          venue_name: string;
+          venue_street_address: string;
+          venue_city: string;
+          venue_region: string;
+          venue_postal_code?: string | null;
+          venue_country?: string | null;
+          venue_latitude?: number | null;
+          venue_longitude?: number | null;
+          venue_website?: string | null;
+          venue_notes?: string | null;
+        };
+        Returns: {
+          created_venue_id: string;
+          created_venue_slug: string;
+          created_venue_name: string;
+          created_street_address: string | null;
+          created_city: string;
+          created_region: string;
+          created_postal_code: string | null;
+          created_country: string;
+          created_latitude: number;
+          created_longitude: number;
+        }[];
+      };
+      create_game: {
+        Args: {
+          game_title: string;
+          game_manufacturer?: string | null;
+          game_release_year?: number | null;
+          game_aliases?: string[] | null;
+          game_categories?: string[] | null;
+        };
+        Returns: {
+          created_game_id: string;
+          created_game_slug: string;
+          created_game_title: string;
+          created_game_manufacturer: string | null;
+          created_game_release_year: number | null;
+          created_game_aliases: string[];
+          created_game_categories: string[];
+        }[];
+      };
       find_nearest_venues: {
         Args: {
           user_lat: number;
@@ -286,6 +333,7 @@ export interface Database {
           manufacturer: string | null;
           release_year: number | null;
           aliases: string[] | null;
+          categories: string[] | null;
           quantity: number | null;
           availability_status: AvailabilityStatus | null;
           machine_label: string | null;
@@ -337,6 +385,7 @@ export interface Database {
           manufacturer: string | null;
           release_year: number | null;
           aliases: string[];
+          categories: string[];
           similarity_score: number;
         }[];
       };

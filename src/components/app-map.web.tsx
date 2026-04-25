@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import L from "leaflet";
 import { MapContainer } from "react-leaflet/MapContainer";
@@ -35,37 +35,47 @@ function createMarkerIcon(isUserLocation: boolean) {
   });
 }
 
-function FitToPins({
+function FitToRegion({
   onMapInteractionChange,
-  pins,
   region,
+  regionSignature,
 }: {
   onMapInteractionChange?: AppMapProps["onMapInteractionChange"];
-  pins: AppMapProps["pins"];
   region: AppMapProps["region"];
+  regionSignature: string;
 }) {
   const map = useMap();
+  const lastAppliedSignature = useRef<string | null>(null);
 
   useEffect(() => {
-    if (pins.length === 0) {
+    if (lastAppliedSignature.current === regionSignature) {
+      return;
+    }
+
+    if (region.latitudeDelta <= 0 || region.longitudeDelta <= 0) {
       map.setView([region.latitude, region.longitude], 12);
+      lastAppliedSignature.current = regionSignature;
       return;
     }
 
     const bounds = L.latLngBounds(
-      pins.map(
-        (pin) =>
-          [pin.coordinate.latitude, pin.coordinate.longitude] as [
-            number,
-            number,
-          ],
-      ),
+      [
+        [
+          region.latitude - region.latitudeDelta / 2,
+          region.longitude - region.longitudeDelta / 2,
+        ],
+        [
+          region.latitude + region.latitudeDelta / 2,
+          region.longitude + region.longitudeDelta / 2,
+        ],
+      ] as [[number, number], [number, number]],
     );
 
     map.fitBounds(bounds, {
       padding: [36, 36],
     });
-  }, [map, pins, region.latitude, region.longitude]);
+    lastAppliedSignature.current = regionSignature;
+  }, [map, region, regionSignature]);
 
   useMapEvents({
     dragend: () => onMapInteractionChange?.(false),
@@ -87,6 +97,19 @@ export function AppMap({
   onPinPress,
   selectedPinId,
 }: AppMapProps) {
+  const regionSignature = useMemo(
+    () =>
+      JSON.stringify(
+        {
+          latitude: region.latitude,
+          latitudeDelta: region.latitudeDelta,
+          longitude: region.longitude,
+          longitudeDelta: region.longitudeDelta,
+        },
+      ),
+    [region],
+  );
+
   return (
     <View style={styles.wrapper}>
       <View style={[styles.mapFrame, { height }]}>
@@ -100,10 +123,10 @@ export function AppMap({
             attribution="&copy; OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <FitToPins
+          <FitToRegion
             onMapInteractionChange={onMapInteractionChange}
-            pins={pins}
             region={region}
+            regionSignature={regionSignature}
           />
           {pins.map((pin) => (
             <Marker
@@ -132,37 +155,12 @@ export function AppMap({
         </MapContainer>
       </View>
 
-      <View style={styles.captionRow}>
-        <View style={styles.captionCard}>
-          <Text style={styles.captionValue}>
-            {pins.filter((pin) => !pin.isUserLocation).length}
-          </Text>
-          <Text style={styles.captionLabel}>arcade pins</Text>
-        </View>
-        <View style={styles.captionCard}>
-          <Text style={styles.captionValue}>{getDisplayAddress(pins)}</Text>
-          <Text style={styles.captionLabel}>address</Text>
-        </View>
-      </View>
     </View>
   );
 }
 
-function getDisplayAddress(pins: AppMapProps["pins"]): string {
-  const firstVenuePin = pins.find(
-    (pin) => !pin.isUserLocation && pin.description,
-  );
-
-  if (firstVenuePin?.description) {
-    return firstVenuePin.description;
-  }
-
-  return "Address unavailable";
-}
-
 const styles = StyleSheet.create({
   wrapper: {
-    gap: theme.spacing.md,
     width: "100%",
   },
   mapFrame: {
@@ -175,29 +173,6 @@ const styles = StyleSheet.create({
   map: {
     height: "100%",
     width: "100%",
-  },
-  captionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.sm,
-  },
-  captionCard: {
-    backgroundColor: theme.colors.surfaceMuted,
-    borderRadius: theme.radius.sm,
-    flexGrow: 1,
-    gap: 4,
-    minWidth: 160,
-    padding: theme.spacing.md,
-  },
-  captionValue: {
-    color: theme.colors.textPrimary,
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  captionLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    textTransform: "uppercase",
   },
   popupContent: {
     gap: 4,

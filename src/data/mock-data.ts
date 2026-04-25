@@ -20,6 +20,7 @@ export const games: Game[] = [
     manufacturer: 'Capcom',
     releaseYear: 1999,
     aliases: ['3rd Strike', 'SF3'],
+    categories: ['Fighting'],
   },
   {
     id: 'marvel-vs-capcom-2',
@@ -28,6 +29,7 @@ export const games: Game[] = [
     manufacturer: 'Capcom',
     releaseYear: 2000,
     aliases: ['MVC2'],
+    categories: ['Fighting'],
   },
   {
     id: 'dance-dance-revolution-a20',
@@ -36,6 +38,7 @@ export const games: Game[] = [
     manufacturer: 'Konami',
     releaseYear: 2019,
     aliases: ['DDR', 'DDR A20'],
+    categories: ['Rhythm'],
   },
   {
     id: 'time-crisis-2',
@@ -44,6 +47,7 @@ export const games: Game[] = [
     manufacturer: 'Namco',
     releaseYear: 1997,
     aliases: ['TC2'],
+    categories: ['Light gun'],
   },
   {
     id: 'killer-queen',
@@ -52,6 +56,7 @@ export const games: Game[] = [
     manufacturer: 'BumbleBear Games',
     releaseYear: 2013,
     aliases: ['KQ'],
+    categories: ['Action'],
   },
 ];
 
@@ -206,6 +211,10 @@ function getGameSearchScore(game: Game, query: string): number {
     return 20;
   }
 
+  if (game.categories.some((category) => category.toLowerCase().includes(normalizedQuery))) {
+    return 15;
+  }
+
   return 0;
 }
 
@@ -236,7 +245,8 @@ function getInventoryItem(
 
 export function findVenueMatches(
   gameId: string,
-  userLocation: Coordinates
+  userLocation: Coordinates,
+  maxDistanceMiles = Infinity
 ): VenueMatch[] {
   const game = getGameById(gameId);
 
@@ -263,6 +273,7 @@ export function findVenueMatches(
       };
     })
     .filter((match): match is VenueMatch => match !== null)
+    .filter((match) => match.distanceMiles <= maxDistanceMiles)
     .sort((left, right) => {
       if (left.inventory.status !== right.inventory.status) {
         return getStatusSortValue(left.inventory.status) -
@@ -274,7 +285,8 @@ export function findVenueMatches(
 }
 
 export function findNearbyVenues(
-  userLocation: Coordinates
+  userLocation: Coordinates,
+  maxDistanceMiles = Infinity
 ): NearbyVenueResult[] {
   return [...venues]
     .map((venue) => ({
@@ -284,6 +296,7 @@ export function findNearbyVenues(
         longitude: venue.longitude,
       }),
     }))
+    .filter((result) => result.distanceMiles <= maxDistanceMiles)
     .sort((left, right) => left.distanceMiles - right.distanceMiles);
 }
 

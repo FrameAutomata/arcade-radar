@@ -1,16 +1,17 @@
-insert into public.games (slug, title, manufacturer, release_year, aliases)
+insert into public.games (slug, title, manufacturer, release_year, aliases, categories)
 values
-  ('street-fighter-iii-3rd-strike', 'Street Fighter III: 3rd Strike', 'Capcom', 1999, array['3rd Strike', 'SF3']),
-  ('marvel-vs-capcom-2', 'Marvel vs. Capcom 2', 'Capcom', 2000, array['MVC2']),
-  ('dance-dance-revolution-a20', 'DanceDanceRevolution A20', 'Konami', 2019, array['DDR', 'DDR A20']),
-  ('time-crisis-2', 'Time Crisis 2', 'Namco', 1997, array['TC2']),
-  ('killer-queen', 'Killer Queen', 'BumbleBear Games', 2013, array['KQ'])
+  ('street-fighter-iii-3rd-strike', 'Street Fighter III: 3rd Strike', 'Capcom', 1999, array['3rd Strike', 'SF3'], array['Fighting']),
+  ('marvel-vs-capcom-2', 'Marvel vs. Capcom 2', 'Capcom', 2000, array['MVC2'], array['Fighting']),
+  ('dance-dance-revolution-a20', 'DanceDanceRevolution A20', 'Konami', 2019, array['DDR', 'DDR A20'], array['Rhythm']),
+  ('time-crisis-2', 'Time Crisis 2', 'Namco', 1997, array['TC2'], array['Light gun']),
+  ('killer-queen', 'Killer Queen', 'BumbleBear Games', 2013, array['KQ'], array['Action'])
 on conflict (slug) do update
 set
   title = excluded.title,
   manufacturer = excluded.manufacturer,
   release_year = excluded.release_year,
-  aliases = excluded.aliases;
+  aliases = excluded.aliases,
+  categories = excluded.categories;
 
 insert into public.venues (
   slug,

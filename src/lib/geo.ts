@@ -4,6 +4,7 @@ export interface Coordinates {
 }
 
 const EARTH_RADIUS_MILES = 3958.8;
+const DEFAULT_MAX_FIT_DISTANCE_MILES = 100;
 
 function toRadians(value: number): number {
   return (value * Math.PI) / 180;
@@ -32,14 +33,19 @@ export function distanceInMiles(
 
 export function buildMapRegion(
   origin: Coordinates,
-  destinations: Coordinates[]
+  destinations: Coordinates[],
+  maxFitDistanceMiles = DEFAULT_MAX_FIT_DISTANCE_MILES
 ): {
   latitude: number;
   longitude: number;
   latitudeDelta: number;
   longitudeDelta: number;
 } {
-  const points = [origin, ...destinations];
+  const nearbyDestinations = destinations.filter(
+    (destination) =>
+      distanceInMiles(origin, destination) <= maxFitDistanceMiles
+  );
+  const points = [origin, ...nearbyDestinations];
   const latitudes = points.map((point) => point.latitude);
   const longitudes = points.map((point) => point.longitude);
   const minLatitude = Math.min(...latitudes);
