@@ -53,6 +53,7 @@ interface CreatedScoutGameResult {
   manufacturer: string | null;
   releaseYear: number | null;
   aliases: string[];
+  categories: string[];
 }
 
 interface ApprovedInventoryReportResult {
@@ -222,6 +223,7 @@ export async function createScoutGame(input: {
   manufacturer?: string;
   releaseYear?: number | null;
   aliases?: string[];
+  categories?: string[];
 }): Promise<CreatedScoutGameResult | null> {
   if (!hasSupabaseCredentials || !supabase) {
     throw new Error('Supabase is not configured for Scout Mode.');
@@ -236,6 +238,10 @@ export async function createScoutGame(input: {
       game_aliases:
         input.aliases
           ?.map((alias) => alias.trim())
+          .filter(Boolean) ?? [],
+      game_categories:
+        input.categories
+          ?.map((category) => category.trim())
           .filter(Boolean) ?? [],
     } as never,
   );
@@ -252,6 +258,7 @@ export async function createScoutGame(input: {
         created_game_manufacturer: string | null;
         created_game_release_year: number | null;
         created_game_aliases: string[];
+        created_game_categories: string[];
       }
     | null;
 
@@ -261,6 +268,7 @@ export async function createScoutGame(input: {
 
   return {
     aliases: firstRow.created_game_aliases,
+    categories: firstRow.created_game_categories,
     id: firstRow.created_game_id,
     manufacturer: firstRow.created_game_manufacturer,
     releaseYear: firstRow.created_game_release_year,

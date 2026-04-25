@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
-import { Link } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
 import {
+  useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
@@ -24,7 +25,7 @@ import { AppMap } from "@/components/app-map";
 import { ResultCard } from "@/components/result-card";
 import { theme } from "@/constants/theme";
 import { featuredGames as mockFeaturedGames } from "@/data/mock-data";
-import { hasSupabaseCredentials } from "@/lib/env";
+import { getAuthSessionSummary, type AuthSessionSummary } from "@/lib/auth";
 import { formatDistanceMiles } from "@/lib/format";
 import { resolveAppLocation } from "@/lib/geocoding";
 import { buildMapRegion, type Coordinates } from "@/lib/geo";
@@ -38,6 +39,9 @@ import {
 import { openDirections } from "@/lib/navigation";
 import { demoLocationLabel } from "@/lib/search";
 import type { Game, NearbyVenueResult } from "@/types/domain";
+
+const DISTANCE_FILTERS_MILES = [10, 25, 50, 100, 250] as const;
+const DEFAULT_DISTANCE_FILTER_MILES = 50;
 
 export default function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -54,21 +58,25 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+  const [distanceFilterMiles, setDistanceFilterMiles] = useState(
+    DEFAULT_DISTANCE_FILTER_MILES,
+  );
   const [featuredGames, setFeaturedGames] = useState<Game[]>(mockFeaturedGames);
   const [suggestions, setSuggestions] = useState<Game[]>(mockFeaturedGames);
   const [results, setResults] = useState<NearbyVenueResult[]>([]);
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
+  const [authSession, setAuthSession] = useState<AuthSessionSummary | null>(null);
   const deferredQuery = useDeferredValue(searchQuery);
 
   const game = selectedGame;
   const scoutLinkStyle = StyleSheet.flatten([
-    styles.marqueePill,
-    styles.marqueePillAction,
+    styles.navButton,
+    styles.navButtonSecondary,
   ]) as ViewStyle;
   const authLinkStyle = StyleSheet.flatten([
-    styles.marqueePill,
-    styles.marqueePillSecondary,
+    styles.navButton,
+    authSession && styles.navButtonActive,
   ]) as ViewStyle;
   const mapRegion = useMemo(
     () =>
@@ -108,6 +116,32 @@ export default function HomeScreen() {
       cancelled = true;
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      async function loadAuthSession() {
+        try {
+          const nextSession = await getAuthSessionSummary();
+
+          if (!cancelled) {
+            setAuthSession(nextSession);
+          }
+        } catch {
+          if (!cancelled) {
+            setAuthSession(null);
+          }
+        }
+      }
+
+      void loadAuthSession();
+
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -149,8 +183,8 @@ export default function HomeScreen() {
 
       try {
         const nextResults = game
-          ? await findVenueMatchesLive(game, userLocation)
-          : await findNearbyVenuesLive(userLocation);
+          ? await findVenueMatchesLive(game, userLocation, distanceFilterMiles)
+          : await findNearbyVenuesLive(userLocation, distanceFilterMiles);
 
         if (!cancelled) {
           setResults(nextResults);
@@ -159,7 +193,7 @@ export default function HomeScreen() {
         if (!cancelled) {
           setResults([]);
           setResultsError(
-            "Could not load live arcade data yet. Check your Supabase schema and seed data.",
+            "Could not load arcade data right now. Try again in a moment.",
           );
         }
       } finally {
@@ -174,7 +208,7 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [game, userLocation]);
+  }, [distanceFilterMiles, game, userLocation]);
 
   const pins = [
     {
@@ -307,50 +341,19 @@ export default function HomeScreen() {
         ]}
         scrollEnabled={Platform.OS === "web" ? true : !isMapInteracting}
       >
-        <View style={styles.marqueeRow}>
-          <View style={styles.marqueePill}>
-            <Text style={styles.marqueeText}>Arcade Radar</Text>
-          </View>
-          <View style={[styles.marqueePill, styles.marqueePillSecondary]}>
-            <Text style={styles.marqueeText}>
-              Retro signal, practical search
-            </Text>
-          </View>
+        <View style={styles.topActions}>
           <Link href="./scout" asChild>
             <Pressable style={scoutLinkStyle}>
-              <Text style={styles.marqueeText}>Scout mode</Text>
+              <Text style={styles.navButtonText}>Scout</Text>
             </Pressable>
           </Link>
           <Link href="./auth" asChild>
             <Pressable style={authLinkStyle}>
-              <Text style={styles.marqueeText}>Sign in</Text>
+              <Text style={styles.navButtonText}>
+                {authSession ? "Account & sign out" : "Sign in"}
+              </Text>
             </Pressable>
           </Link>
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.heroGlow} />
-          <Text style={styles.eyebrow}>Nearby first, game filter second</Text>
-          <Text style={styles.title}>
-            Find arcades near you and filter the same map by game.
-          </Text>
-          <Text style={styles.description}>
-            Arcade Radar is built to feel fast and useful first, with just
-            enough retro-futurist energy to make every search feel like tuning
-            into a lost local signal from arcade culture.
-          </Text>
-          <View style={styles.heroStats}>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{results.length}</Text>
-              <Text style={styles.heroStatLabel}>visible arcades</Text>
-            </View>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>
-                {game ? game.title : "All games"}
-              </Text>
-              <Text style={styles.heroStatLabel}>active filter</Text>
-            </View>
-          </View>
         </View>
 
         <View style={styles.panel}>
@@ -405,6 +408,38 @@ export default function HomeScreen() {
             Try a street address or ZIP code like `60647`, `60513`, or `9415
             Ogden Ave`.
           </Text>
+
+          <View style={styles.distanceFilterBlock}>
+            <View style={styles.filterHeader}>
+              <Text style={styles.sectionTitle}>Distance</Text>
+              <Text style={styles.distanceMeta}>
+                Within {distanceFilterMiles} mi
+              </Text>
+            </View>
+            <View style={styles.distanceChipRow}>
+              {DISTANCE_FILTERS_MILES.map((distanceMiles) => (
+                <Pressable
+                  key={distanceMiles}
+                  onPress={() => setDistanceFilterMiles(distanceMiles)}
+                  style={[
+                    styles.distanceChip,
+                    distanceFilterMiles === distanceMiles &&
+                      styles.distanceChipSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.distanceChipText,
+                      distanceFilterMiles === distanceMiles &&
+                        styles.distanceChipTextSelected,
+                    ]}
+                  >
+                    {distanceMiles} mi
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
           <View style={styles.filterHeader}>
             <Text style={styles.sectionTitle}>Game filter</Text>
@@ -489,20 +524,14 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={styles.summaryLabel}>closest distance</Text>
               </View>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryValue}>
-                  {hasSupabaseCredentials ? "Supabase" : "Mock"}
-                </Text>
-                <Text style={styles.summaryLabel}>data source</Text>
-              </View>
             </View>
 
             <Text style={styles.mapHint}>
               {isLoadingResults
                 ? "Loading nearby arcade data..."
                 : game
-                ? `Showing only arcades with ${game.title}.`
-                : "Showing every nearby arcade from the current data source."}
+                ? `Showing arcades within ${distanceFilterMiles} miles that have ${game.title}.`
+                : `Showing arcades within ${distanceFilterMiles} miles.`}
             </Text>
           </View>
 
@@ -515,7 +544,6 @@ export default function HomeScreen() {
           >
             <View style={styles.listHeader}>
               <Text style={styles.sectionTitle}>Arcades</Text>
-              <Text style={styles.listMeta}>OpenStreetMap-based map view</Text>
             </View>
 
             {isLoadingResults ? (
@@ -533,8 +561,8 @@ export default function HomeScreen() {
             ) : (
               <Text style={styles.emptyText}>
                 {game
-                  ? "No arcades currently match this game near the selected location."
-                  : "No nearby arcades were found for the selected location."}
+                  ? `No arcades currently match this game within ${distanceFilterMiles} miles of the selected location.`
+                  : `No nearby arcades were found within ${distanceFilterMiles} miles of the selected location.`}
               </Text>
             )}
           </View>
@@ -559,12 +587,13 @@ const styles = StyleSheet.create({
     maxWidth: 1440,
     width: "100%",
   },
-  marqueeRow: {
+  topActions: {
+    justifyContent: "flex-end",
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.sm,
   },
-  marqueePill: {
+  navButton: {
     backgroundColor: theme.colors.surfaceGlass,
     borderColor: theme.colors.borderStrong,
     borderRadius: 999,
@@ -572,83 +601,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  marqueePillSecondary: {
+  navButtonSecondary: {
     borderColor: theme.colors.border,
   },
-  marqueePillAction: {
+  navButtonActive: {
     borderColor: theme.colors.brand,
   },
-  marqueeText: {
+  navButtonText: {
     color: theme.colors.accent,
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  hero: {
-    backgroundColor: theme.colors.surfaceGlass,
-    borderColor: theme.colors.borderStrong,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    gap: theme.spacing.sm,
-    padding: theme.spacing.lg,
-    position: "relative",
-    overflow: "hidden",
-  },
-  heroGlow: {
-    backgroundColor: theme.colors.highlight,
-    borderRadius: 999,
-    height: 160,
-    opacity: 0.12,
-    position: "absolute",
-    right: -30,
-    top: -30,
-    width: 160,
-  },
-  eyebrow: {
-    color: theme.colors.brandMuted,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.8,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: theme.colors.textPrimary,
-    fontSize: 40,
-    fontWeight: "800",
-    lineHeight: 44,
-  },
-  description: {
-    color: theme.colors.textSecondary,
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  heroStats: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
-  },
-  heroStat: {
-    backgroundColor: "rgba(8, 15, 30, 0.72)",
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    flexGrow: 1,
-    gap: 4,
-    minWidth: 180,
-    padding: theme.spacing.md,
-  },
-  heroStatValue: {
-    color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  heroStatLabel: {
-    color: theme.colors.accentMuted,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
     textTransform: "uppercase",
   },
   panel: {
@@ -752,6 +715,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  distanceFilterBlock: {
+    gap: theme.spacing.sm,
+  },
+  distanceMeta: {
+    color: theme.colors.accentMuted,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  distanceChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  distanceChip: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  distanceChipSelected: {
+    backgroundColor: theme.colors.surfaceStrong,
+    borderColor: theme.colors.brand,
+  },
+  distanceChipText: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  distanceChipTextSelected: {
+    color: theme.colors.brandMuted,
+  },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -841,12 +837,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-  listMeta: {
-    color: theme.colors.accentMuted,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.6,
   },
   resultsList: {
     gap: theme.spacing.sm,

@@ -1,10 +1,13 @@
-import { Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -12,33 +15,98 @@ import {
 import { AppMap } from "@/components/app-map";
 import { theme } from "@/constants/theme";
 import {
-  formatDistanceMiles,
   formatVerificationAge,
   formatVerificationDate,
 } from "@/lib/format";
-import { distanceInMiles } from "@/lib/geo";
 import { getVenueDetailsLive, type VenueDetailsModel } from "@/lib/live-data";
 import { openDirections } from "@/lib/navigation";
 
-const fallbackLocation = {
-  latitude: 41.9295,
-  longitude: -87.7071,
-};
+const GAME_REPORT_ACTIONS = [
+  {
+    label: "Working",
+    reportType: "confirmed_present",
+  },
+  {
+    label: "Maintenance",
+    reportType: "temporarily_unavailable",
+  },
+  {
+    label: "Missing",
+    reportType: "missing",
+  },
+] as const;
+
+const INVENTORY_STATUS_FILTERS = [
+  {
+    label: "All",
+    value: "all",
+  },
+  {
+    label: "Working",
+    value: "confirmed_present",
+  },
+  {
+    label: "Maintenance",
+    value: "temporarily_unavailable",
+  },
+  {
+    label: "Needs confirmation",
+    value: "rumored_present",
+  },
+  {
+    label: "Missing",
+    value: "removed",
+  },
+] as const;
+
+type InventoryStatusFilter = (typeof INVENTORY_STATUS_FILTERS)[number]["value"];
 
 function getStatusLabel(status: string): string {
   switch (status) {
     case "confirmed_present":
-      return "Confirmed on site";
+      return "Working";
     case "temporarily_unavailable":
-      return "Temporarily unavailable";
+      return "Under maintenance";
     case "rumored_present":
       return "Needs confirmation";
+    case "removed":
+      return "Reported missing";
     default:
       return status;
   }
 }
 
+function getStatusTone(status: string) {
+  switch (status) {
+    case "confirmed_present":
+      return {
+        backgroundColor: "rgba(57, 217, 138, 0.12)",
+        borderColor: theme.colors.success,
+        textColor: theme.colors.success,
+      };
+    case "temporarily_unavailable":
+      return {
+        backgroundColor: "rgba(255, 213, 74, 0.12)",
+        borderColor: theme.colors.warning,
+        textColor: theme.colors.warning,
+      };
+    case "removed":
+      return {
+        backgroundColor: "rgba(255, 95, 162, 0.12)",
+        borderColor: theme.colors.highlight,
+        textColor: theme.colors.highlight,
+      };
+    default:
+      return {
+        backgroundColor: "rgba(120, 215, 255, 0.12)",
+        borderColor: theme.colors.accentMuted,
+        textColor: theme.colors.accentMuted,
+      };
+  }
+}
+
 export default function VenueDetailsScreen() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isWideLayout = Platform.OS === "web" && width >= 1100;
   const params = useLocalSearchParams<{ id: string }>();
@@ -47,6 +115,14 @@ export default function VenueDetailsScreen() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [inventoryQuery, setInventoryQuery] = useState("");
+  const [inventoryStatusFilter, setInventoryStatusFilter] =
+    useState<InventoryStatusFilter>("all");
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState("all");
+  const [expandedInventoryIds, setExpandedInventoryIds] = useState<
+    Record<string, boolean>
+  >({});
+  const [isDenseInventory, setIsDenseInventory] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +147,7 @@ export default function VenueDetailsScreen() {
         if (!cancelled) {
           setVenueDetails(null);
           setLoadError(
-            "Could not load this venue from Supabase yet. Check the venue details RPC and seed data.",
+            "Could not load this venue right now. Try again in a moment.",
           );
         }
       } finally {
@@ -90,6 +166,48 @@ export default function VenueDetailsScreen() {
 
   const venue = venueDetails?.venue;
   const gamesById = venueDetails?.gamesById ?? {};
+  const inventoryCategories = useMemo(() => {
+    const categorySet = new Set<string>();
+
+    for (const item of venueDetails?.venue.inventory ?? []) {
+      const game = venueDetails?.gamesById[item.gameId];
+
+      for (const category of game?.categories ?? []) {
+        categorySet.add(category);
+      }
+    }
+
+    return Array.from(categorySet).sort((left, right) =>
+      left.localeCompare(right),
+    );
+  }, [venueDetails]);
+  const filteredInventory = useMemo(() => {
+    const normalizedQuery = inventoryQuery.trim().toLowerCase();
+
+    return (venueDetails?.venue.inventory ?? []).filter((item) => {
+      const game = venueDetails?.gamesById[item.gameId];
+      const searchableText = [
+        game?.title,
+        game?.manufacturer,
+        ...(game?.categories ?? []),
+        item.gameId,
+        item.note,
+        getStatusLabel(item.status),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const matchesQuery =
+        !normalizedQuery || searchableText.includes(normalizedQuery);
+      const matchesStatus =
+        inventoryStatusFilter === "all" || item.status === inventoryStatusFilter;
+      const matchesCategory =
+        inventoryCategoryFilter === "all" ||
+        (game?.categories ?? []).includes(inventoryCategoryFilter);
+
+      return matchesQuery && matchesStatus && matchesCategory;
+    });
+  }, [inventoryCategoryFilter, inventoryQuery, inventoryStatusFilter, venueDetails]);
 
   if (isLoading) {
     return (
@@ -97,7 +215,7 @@ export default function VenueDetailsScreen() {
         <Stack.Screen options={{ title: "Loading venue" }} />
         <Text style={styles.missingTitle}>Loading venue</Text>
         <Text style={styles.missingText}>
-          Pulling the latest venue data from the current source.
+          Pulling the latest venue details.
         </Text>
       </View>
     );
@@ -110,16 +228,60 @@ export default function VenueDetailsScreen() {
         <Text style={styles.missingTitle}>Venue not found</Text>
         <Text style={styles.missingText}>
           {loadError ??
-            "This route is wired up, but the current data source does not contain that venue id."}
+            "This venue is not available right now."}
         </Text>
       </View>
     );
   }
 
-  const distanceMiles = distanceInMiles(fallbackLocation, {
-    latitude: venue.latitude,
-    longitude: venue.longitude,
-  });
+  const directionsInput = {
+    address: `${venue.address}, ${venue.city}, ${venue.region}`,
+    destination: {
+      latitude: venue.latitude,
+      longitude: venue.longitude,
+    },
+    label: `${venue.name}, ${venue.address}, ${venue.city}, ${venue.region}`,
+  };
+  const venueId = venue.id;
+
+  function openVenueDirections() {
+    void openDirections(directionsInput);
+  }
+
+  function openScoutForVenue() {
+    router.push({
+      pathname: "/scout",
+      params: {
+        venueId,
+      },
+    });
+  }
+
+  function openScoutForGame(
+    game: NonNullable<VenueDetailsModel["gamesById"][string]>,
+    reportType: (typeof GAME_REPORT_ACTIONS)[number]["reportType"],
+  ) {
+    router.push({
+      pathname: "/scout",
+      params: {
+        gameId: game.id,
+        gameCategories: game.categories.join('|'),
+        gameManufacturer: game.manufacturer,
+        gameReleaseYear: String(game.releaseYear),
+        gameSlug: game.slug,
+        gameTitle: game.title,
+        reportType,
+        venueId,
+      },
+    });
+  }
+
+  function toggleInventoryDetails(itemId: string) {
+    setExpandedInventoryIds((currentIds) => ({
+      ...currentIds,
+      [itemId]: !currentIds[itemId],
+    }));
+  }
 
   return (
     <>
@@ -130,15 +292,6 @@ export default function VenueDetailsScreen() {
           isWideLayout && styles.contentWide,
         ]}
       >
-        <View style={styles.marqueeRow}>
-          <View style={styles.marqueePill}>
-            <Text style={styles.marqueeText}>Venue signal</Text>
-          </View>
-          <View style={[styles.marqueePill, styles.marqueePillSecondary]}>
-            <Text style={styles.marqueeText}>Tracked floor intelligence</Text>
-          </View>
-        </View>
-
         <View style={styles.hero}>
           <View style={styles.heroGlow} />
           <Text style={styles.name}>{venue.name}</Text>
@@ -147,13 +300,16 @@ export default function VenueDetailsScreen() {
           </Text>
           <Text style={styles.notes}>{venue.notes}</Text>
 
+          <View style={styles.actionRow}>
+            <Pressable onPress={openVenueDirections} style={styles.primaryAction}>
+              <Text style={styles.primaryActionText}>Get directions</Text>
+            </Pressable>
+            <Pressable onPress={openScoutForVenue} style={styles.secondaryAction}>
+              <Text style={styles.secondaryActionText}>Scout this venue</Text>
+            </Pressable>
+          </View>
+
           <View style={styles.metaRow}>
-            <View style={styles.metaCard}>
-              <Text style={styles.metaValue}>
-                {formatDistanceMiles(distanceMiles)}
-              </Text>
-              <Text style={styles.metaLabel}>from demo location</Text>
-            </View>
             <View style={styles.metaCard}>
               <Text style={styles.metaValue}>{venue.verifiedByCount}</Text>
               <Text style={styles.metaLabel}>community confirmations</Text>
@@ -175,14 +331,7 @@ export default function VenueDetailsScreen() {
             <AppMap
               height={isWideLayout ? 360 : 220}
               onPinPress={() => {
-                void openDirections({
-                  address: `${venue.address}, ${venue.city}, ${venue.region}`,
-                  destination: {
-                    latitude: venue.latitude,
-                    longitude: venue.longitude,
-                  },
-                  label: `${venue.name}, ${venue.address}, ${venue.city}, ${venue.region}`,
-                });
+                openVenueDirections();
               }}
               pins={[
                 {
@@ -212,44 +361,239 @@ export default function VenueDetailsScreen() {
             ]}
           >
             <Text style={styles.sectionTitle}>Tracked inventory</Text>
+            <View style={styles.inventoryToolbar}>
+              <TextInput
+                autoCapitalize="words"
+                autoCorrect={false}
+                onChangeText={setInventoryQuery}
+                placeholder="Search tracked games"
+                placeholderTextColor={theme.colors.textMuted}
+                style={styles.inventorySearchInput}
+                value={inventoryQuery}
+              />
+              <View style={styles.inventoryFilterRow}>
+                {INVENTORY_STATUS_FILTERS.map((filter) => (
+                  <Pressable
+                    key={filter.value}
+                    onPress={() => setInventoryStatusFilter(filter.value)}
+                    style={[
+                      styles.inventoryFilterChip,
+                      inventoryStatusFilter === filter.value &&
+                        styles.inventoryFilterChipSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.inventoryFilterChipText,
+                        inventoryStatusFilter === filter.value &&
+                          styles.inventoryFilterChipTextSelected,
+                      ]}
+                    >
+                      {filter.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {inventoryCategories.length > 0 ? (
+                <View style={styles.inventoryFilterRow}>
+                  <Pressable
+                    onPress={() => setInventoryCategoryFilter("all")}
+                    style={[
+                      styles.inventoryFilterChip,
+                      inventoryCategoryFilter === "all" &&
+                        styles.inventoryFilterChipSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.inventoryFilterChipText,
+                        inventoryCategoryFilter === "all" &&
+                          styles.inventoryFilterChipTextSelected,
+                      ]}
+                    >
+                      All types
+                    </Text>
+                  </Pressable>
+                  {inventoryCategories.map((category) => (
+                    <Pressable
+                      key={category}
+                      onPress={() => setInventoryCategoryFilter(category)}
+                      style={[
+                        styles.inventoryFilterChip,
+                        inventoryCategoryFilter === category &&
+                          styles.inventoryFilterChipSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.inventoryFilterChipText,
+                          inventoryCategoryFilter === category &&
+                            styles.inventoryFilterChipTextSelected,
+                        ]}
+                      >
+                        {category}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <Text style={styles.inventoryResultMeta}>
+                Showing {filteredInventory.length} of {venue.inventory.length} tracked games
+              </Text>
+              <View style={styles.densitySwitchRow}>
+                <Text
+                  style={[
+                    styles.densityModeSymbol,
+                    !isDenseInventory && styles.densityModeSymbolActive,
+                  ]}
+                >
+                  ▦
+                </Text>
+                <Switch
+                  onValueChange={setIsDenseInventory}
+                  thumbColor={
+                    isDenseInventory ? theme.colors.accent : theme.colors.textMuted
+                  }
+                  trackColor={{
+                    false: theme.colors.surfaceMuted,
+                    true: "rgba(60, 242, 211, 0.35)",
+                  }}
+                  value={isDenseInventory}
+                />
+                <Text
+                  style={[
+                    styles.densityModeSymbol,
+                    isDenseInventory && styles.densityModeSymbolActive,
+                  ]}
+                >
+                  ☰
+                </Text>
+              </View>
+            </View>
             <View style={styles.inventoryList}>
-              {venue.inventory.map((item) => {
+              {filteredInventory.length > 0 ? (
+                filteredInventory.map((item) => {
                 const game = gamesById[item.gameId];
+                const statusTone = getStatusTone(item.status);
+                const itemKey = `${venue.id}-${item.gameId}`;
+                const isExpanded = Boolean(expandedInventoryIds[itemKey]);
 
                 return (
                   <View
-                    key={`${venue.id}-${item.gameId}`}
-                    style={styles.inventoryCard}
+                    key={itemKey}
+                    style={[
+                      styles.inventoryCard,
+                      isDenseInventory && styles.inventoryCardDense,
+                    ]}
                   >
-                    <Text style={styles.inventoryTitle}>
-                      {game?.title ?? item.gameId}
-                    </Text>
-                    <Text style={styles.inventoryMeta}>
-                      {getStatusLabel(item.status)} • {item.quantity} machine
-                      {item.quantity > 1 ? "s" : ""}
-                    </Text>
-                    <Text style={styles.inventoryMeta}>
-                      Last verified{" "}
-                      {formatVerificationDate(item.lastVerifiedAt)} (
-                      {formatVerificationAge(item.lastVerifiedAt)})
-                    </Text>
-                    {item.note ? (
-                      <Text style={styles.inventoryNote}>{item.note}</Text>
+                    <View
+                      style={[
+                        styles.inventoryTitleRow,
+                        isDenseInventory && styles.inventoryTitleRowDense,
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={isDenseInventory ? 1 : undefined}
+                        style={[
+                          styles.inventoryTitle,
+                          isDenseInventory && styles.inventoryTitleDense,
+                        ]}
+                      >
+                        {game?.title ?? item.gameId}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.statusPill,
+                          isDenseInventory && styles.statusPillDense,
+                          {
+                            backgroundColor: statusTone.backgroundColor,
+                            borderColor: statusTone.borderColor,
+                            color: statusTone.textColor,
+                          },
+                        ]}
+                      >
+                        {getStatusLabel(item.status)}
+                      </Text>
+                    </View>
+                    <View style={styles.inventoryMetaRow}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.inventoryMeta,
+                          isDenseInventory && styles.inventoryMetaDense,
+                        ]}
+                      >
+                        {isDenseInventory
+                          ? formatVerificationAge(item.lastVerifiedAt)
+                          : `Last reported ${formatVerificationDate(item.lastVerifiedAt)} (${formatVerificationAge(item.lastVerifiedAt)})`}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.inventoryMeta,
+                          isDenseInventory && styles.inventoryMetaDense,
+                        ]}
+                      >
+                        {isDenseInventory
+                          ? `${item.quantity}x`
+                          : `${item.quantity} machine${item.quantity > 1 ? "s" : ""} tracked`}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => toggleInventoryDetails(itemKey)}
+                      style={[
+                        styles.detailsToggle,
+                        isDenseInventory && styles.detailsToggleDense,
+                      ]}
+                    >
+                      <Text style={styles.detailsToggleText}>
+                        {isExpanded ? "Hide" : "Details"}
+                      </Text>
+                    </Pressable>
+                    {isExpanded ? (
+                      <View style={styles.reportActionBlock}>
+                        {item.note ? (
+                          <Text style={styles.inventoryNote}>{item.note}</Text>
+                        ) : (
+                          <Text style={styles.inventoryNote}>
+                            No cabinet notes have been reported yet.
+                          </Text>
+                        )}
+                        <Text style={styles.reportActionLabel}>
+                          Report current status
+                        </Text>
+                        {game ? (
+                          <View style={styles.reportActionRow}>
+                            {GAME_REPORT_ACTIONS.map((action) => (
+                              <Pressable
+                                key={action.reportType}
+                                onPress={() =>
+                                  openScoutForGame(game, action.reportType)
+                                }
+                                style={styles.reportActionChip}
+                              >
+                                <Text style={styles.reportActionChipText}>
+                                  {action.label}
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                        ) : (
+                          <Text style={styles.inventoryNote}>
+                            Reporting is unavailable until this game resolves in the catalog.
+                          </Text>
+                        )}
+                      </View>
                     ) : null}
                   </View>
                 );
-              })}
+                })
+              ) : (
+                <Text style={styles.emptyInventoryText}>
+                  No tracked games match the current inventory search.
+                </Text>
+              )}
             </View>
           </View>
-        </View>
-
-        <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>What comes next</Text>
-          <Text style={styles.nextStep}>
-            Hook this screen up to `find_nearest_venues_for_game` and a venue
-            detail query in Supabase, then let authenticated players confirm
-            whether each cabinet is still on the floor.
-          </Text>
         </View>
       </ScrollView>
     </>
@@ -267,29 +611,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     maxWidth: 1440,
     width: "100%",
-  },
-  marqueeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.sm,
-  },
-  marqueePill: {
-    backgroundColor: theme.colors.surfaceGlass,
-    borderColor: theme.colors.borderStrong,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  marqueePillSecondary: {
-    borderColor: theme.colors.border,
-  },
-  marqueeText: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
   },
   hero: {
     backgroundColor: theme.colors.surfaceGlass,
@@ -329,6 +650,38 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+  },
+  primaryAction: {
+    alignItems: "center",
+    backgroundColor: theme.colors.brand,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  primaryActionText: {
+    color: theme.colors.textOnBrand,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  secondaryAction: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.accentMuted,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  secondaryActionText: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: "800",
   },
   metaRow: {
     flexDirection: "row",
@@ -394,6 +747,69 @@ const styles = StyleSheet.create({
   inventoryList: {
     gap: theme.spacing.sm,
   },
+  inventoryToolbar: {
+    gap: theme.spacing.sm,
+  },
+  inventorySearchInput: {
+    backgroundColor: theme.colors.backgroundElevated,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 12,
+  },
+  inventoryFilterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  inventoryFilterChip: {
+    backgroundColor: "rgba(8, 15, 30, 0.72)",
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  inventoryFilterChipSelected: {
+    backgroundColor: theme.colors.surfaceStrong,
+    borderColor: theme.colors.brand,
+  },
+  inventoryFilterChipText: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  inventoryFilterChipTextSelected: {
+    color: theme.colors.brandMuted,
+  },
+  inventoryResultMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+  },
+  densitySwitchRow: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(8, 15, 30, 0.72)",
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  densityModeSymbol: {
+    color: theme.colors.textMuted,
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 18,
+  },
+  densityModeSymbolActive: {
+    color: theme.colors.accent,
+  },
   inventoryCard: {
     backgroundColor: theme.colors.surfaceMuted,
     borderColor: theme.colors.border,
@@ -402,24 +818,117 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: theme.spacing.md,
   },
+  inventoryCardDense: {
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  inventoryTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  inventoryTitleRowDense: {
+    flexWrap: "nowrap",
+    gap: 6,
+  },
   inventoryTitle: {
     color: theme.colors.textPrimary,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
     fontSize: 17,
     fontWeight: "700",
+  },
+  inventoryTitleDense: {
+    fontSize: 14,
+    lineHeight: 18,
   },
   inventoryMeta: {
     color: theme.colors.textSecondary,
     fontSize: 14,
+  },
+  inventoryMetaDense: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  inventoryMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  statusPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    textTransform: "uppercase",
+  },
+  statusPillDense: {
+    fontSize: 9,
+    letterSpacing: 0.4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
   inventoryNote: {
     color: theme.colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
   },
-  nextStep: {
+  detailsToggle: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+  },
+  detailsToggleDense: {
+    marginTop: 0,
+  },
+  detailsToggleText: {
+    color: theme.colors.accentMuted,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  emptyInventoryText: {
     color: theme.colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
+  },
+  reportActionBlock: {
+    gap: theme.spacing.xs,
+    marginTop: theme.spacing.xs,
+  },
+  reportActionLabel: {
+    color: theme.colors.accentMuted,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  reportActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  reportActionChip: {
+    backgroundColor: "rgba(8, 15, 30, 0.72)",
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  reportActionChipText: {
+    color: theme.colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "800",
   },
   missingState: {
     alignItems: "center",

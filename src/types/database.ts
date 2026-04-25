@@ -20,6 +20,7 @@ export interface Database {
           manufacturer: string | null;
           release_year: number | null;
           aliases: string[];
+          categories: string[];
           created_at: string;
           updated_at: string;
         };
@@ -30,6 +31,7 @@ export interface Database {
           manufacturer?: string | null;
           release_year?: number | null;
           aliases?: string[];
+          categories?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -39,6 +41,7 @@ export interface Database {
           manufacturer?: string | null;
           release_year?: number | null;
           aliases?: string[];
+          categories?: string[];
           updated_at?: string;
         };
       };
@@ -244,6 +247,7 @@ export interface Database {
           game_manufacturer?: string | null;
           game_release_year?: number | null;
           game_aliases?: string[] | null;
+          game_categories?: string[] | null;
         };
         Returns: {
           created_game_id: string;
@@ -252,6 +256,7 @@ export interface Database {
           created_game_manufacturer: string | null;
           created_game_release_year: number | null;
           created_game_aliases: string[];
+          created_game_categories: string[];
         }[];
       };
       find_nearest_venues: {
@@ -328,6 +333,7 @@ export interface Database {
           manufacturer: string | null;
           release_year: number | null;
           aliases: string[] | null;
+          categories: string[] | null;
           quantity: number | null;
           availability_status: AvailabilityStatus | null;
           machine_label: string | null;
@@ -379,6 +385,7 @@ export interface Database {
           manufacturer: string | null;
           release_year: number | null;
           aliases: string[];
+          categories: string[];
           similarity_score: number;
         }[];
       };

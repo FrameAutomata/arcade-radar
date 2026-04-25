@@ -19,6 +19,8 @@ import type {
   VenueMatch,
 } from '@/types/domain';
 
+const METERS_PER_MILE = 1609.344;
+
 type SearchGameRow = Database['public']['Functions']['search_games']['Returns'][number];
 type GameTableRow = Database['public']['Tables']['games']['Row'];
 type NearbyVenueRow =
@@ -49,12 +51,14 @@ function mapGame(row: SearchGameRow): Game {
     manufacturer: row.manufacturer ?? 'Unknown',
     releaseYear: row.release_year ?? 0,
     aliases: row.aliases ?? [],
+    categories: row.categories ?? [],
   };
 }
 
 function mapGameTableRow(row: GameTableRow): Game {
   return {
     aliases: row.aliases ?? [],
+    categories: row.categories ?? [],
     id: row.id,
     manufacturer: row.manufacturer ?? 'Unknown',
     releaseYear: row.release_year ?? 0,
@@ -156,6 +160,7 @@ function buildVenueDetailsModel(rows: VenueDetailRow[]): VenueDetailsModel | nul
 
     accumulator[row.game_id] = {
       aliases: row.aliases ?? [],
+      categories: row.categories ?? [],
       id: row.game_id,
       manufacturer: row.manufacturer ?? 'Unknown',
       releaseYear: row.release_year ?? 0,
@@ -234,7 +239,7 @@ export async function getFeaturedGamesLive(limit = 4): Promise<Game[]> {
 
   const { data, error } = await client
     .from('games')
-    .select('id, slug, title, manufacturer, release_year, aliases')
+    .select('id, slug, title, manufacturer, release_year, aliases, categories')
     .order('title', { ascending: true })
     .limit(limit);
 
@@ -248,17 +253,19 @@ export async function getFeaturedGamesLive(limit = 4): Promise<Game[]> {
 }
 
 export async function findNearbyVenuesLive(
-  userLocation: Coordinates
+  userLocation: Coordinates,
+  maxDistanceMiles = 50
 ): Promise<NearbyVenueResult[]> {
   const client = assertSupabase();
 
   if (!client) {
-    return findNearbyVenues(userLocation);
+    return findNearbyVenues(userLocation, maxDistanceMiles);
   }
 
   const { data, error } = await client.rpc(
     'find_nearest_venues' as never,
     {
+      max_distance_meters: Math.round(maxDistanceMiles * METERS_PER_MILE),
       user_lat: userLocation.latitude,
       user_lng: userLocation.longitude,
     } as never,
@@ -275,17 +282,19 @@ export async function findNearbyVenuesLive(
 
 export async function findVenueMatchesLive(
   game: Game,
-  userLocation: Coordinates
+  userLocation: Coordinates,
+  maxDistanceMiles = 50
 ): Promise<NearbyVenueResult[]> {
   const client = assertSupabase();
 
   if (!client) {
-    return findVenueMatches(game.id, userLocation);
+    return findVenueMatches(game.id, userLocation, maxDistanceMiles);
   }
 
   const { data, error } = await client.rpc(
     'find_nearest_venues_for_game' as never,
     {
+      max_distance_meters: Math.round(maxDistanceMiles * METERS_PER_MILE),
       selected_game_id: game.id,
       user_lat: userLocation.latitude,
       user_lng: userLocation.longitude,

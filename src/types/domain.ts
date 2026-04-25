@@ -10,6 +10,7 @@ export interface Game {
   manufacturer: string;
   releaseYear: number;
   aliases: string[];
+  categories: string[];
 }
 
 export interface VenueInventoryItem {
