@@ -33,5 +33,5 @@ jobs:
         run: npm run build:web
         env:
           EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--demo.expo.app/
-          EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets['EXPO_PUBLIC_SUPABASE_KEY'] }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets['EXPO_PUBLIC_SUPABASE_URL'] }}
