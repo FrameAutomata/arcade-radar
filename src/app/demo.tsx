@@ -10,6 +10,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
+import {
+  buildDemoSearchParams,
+  featuredDemoSearches,
+} from "@/lib/demo";
 import { env } from "@/lib/env";
 
 const demoUrl = env.authRedirectUrl || "https://arcade-radar--demo.expo.app/";
@@ -28,24 +32,6 @@ const talkingPoints = [
   "Community reports keep rare machine inventory fresh.",
   "Admins approve submissions before they affect live search.",
   "The map stack avoids Google Maps Platform costs.",
-];
-
-const featuredDemoSearches = [
-  {
-    game: "Street Fighter III: 3rd Strike",
-    location: "75201",
-    title: "Fighting game run",
-  },
-  {
-    game: "Marvel vs. Capcom 2",
-    location: "75080",
-    title: "Rare cabinet search",
-  },
-  {
-    game: "DanceDanceRevolution",
-    location: "76051",
-    title: "Rhythm game search",
-  },
 ];
 
 export default function DemoScreen() {
@@ -89,10 +75,7 @@ export default function DemoScreen() {
                   key={search.title}
                   href={{
                     pathname: "/",
-                    params: {
-                      game: search.game,
-                      location: search.location,
-                    },
+                    params: buildDemoSearchParams(search),
                   }}
                   asChild
                 >
