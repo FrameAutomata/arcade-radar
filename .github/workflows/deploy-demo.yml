@@ -2,6 +2,12 @@ name: Deploy Demo
 
 on:
   workflow_dispatch:
+    inputs:
+      alias:
+        description: EAS Hosting alias to deploy
+        required: true
+        default: demo
+        type: string
 
 jobs:
   deploy-demo:
@@ -16,9 +22,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
@@ -29,15 +36,15 @@ jobs:
       - name: Web export
         run: npm run build:web
         env:
-          EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--demo.expo.app/
+          EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--${{ inputs.alias }}.expo.app/
           EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
 
-      - name: Deploy demo alias
-        run: npx eas-cli@latest deploy --alias demo --non-interactive
+      - name: Deploy alias
+        run: npx eas-cli@latest deploy --alias "${{ inputs.alias }}" --non-interactive
         env:
           EAS_NO_VCS: 1
-          EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--demo.expo.app/
+          EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--${{ inputs.alias }}.expo.app/
           EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

@@ -88,8 +88,8 @@ Required GitHub repository secrets:
 - `EXPO_PUBLIC_SUPABASE_KEY`
 - `EXPO_TOKEN` for the manual EAS demo deploy workflow
 
-The CI workflow uses `npm install` instead of `npm ci` because this project
-currently ignores `package-lock.json`.
+The workflows use `npm ci`, so keep `package-lock.json` committed whenever
+dependencies change.
 
 ## Demo Deployment
 
@@ -98,6 +98,9 @@ For mixer demos, use the stable EAS alias instead of one-off deploy URLs:
 ```bash
 npx eas-cli@latest deploy --alias demo
 ```
+
+The GitHub `Deploy Demo` workflow also accepts an alias input. Leave it as
+`demo` for the mixer, or use another alias such as `staging` later.
 
 Use this URL for QR codes and Supabase Auth redirects:
 
