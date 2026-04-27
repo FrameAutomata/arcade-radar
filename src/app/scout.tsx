@@ -24,6 +24,9 @@ import {
   getScoutSessionUser,
   getScoutErrorMessage,
   listPendingGameSubmissions,
+  listMyPendingGameSubmissions,
+  listMyPendingScoutReports,
+  listMyPendingVenueSubmissions,
   rejectScoutInventoryReport,
   rejectGameSubmission,
   rejectVenueSubmission,
@@ -34,6 +37,9 @@ import {
   submitScoutGameSubmission,
   submitScoutInventoryReport,
   submitScoutVenueSubmission,
+  withdrawGameSubmission,
+  withdrawScoutInventoryReport,
+  withdrawVenueSubmission,
   type PendingGameSubmission,
   type PendingInventoryReport,
   type PendingVenueSubmission,
@@ -247,10 +253,16 @@ export default function ScoutScreen() {
   const [pendingReports, setPendingReports] = useState<PendingInventoryReport[]>([]);
   const [pendingVenueSubmissions, setPendingVenueSubmissions] = useState<PendingVenueSubmission[]>([]);
   const [pendingGameSubmissions, setPendingGameSubmissions] = useState<PendingGameSubmission[]>([]);
+  const [myPendingReports, setMyPendingReports] = useState<PendingInventoryReport[]>([]);
+  const [myPendingVenueSubmissions, setMyPendingVenueSubmissions] = useState<PendingVenueSubmission[]>([]);
+  const [myPendingGameSubmissions, setMyPendingGameSubmissions] = useState<PendingGameSubmission[]>([]);
   const [isLoadingQueue, setIsLoadingQueue] = useState(true);
+  const [isLoadingMyPendingItems, setIsLoadingMyPendingItems] = useState(false);
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
+  const [myPendingMessage, setMyPendingMessage] = useState<string | null>(null);
   const [activeModerationReportId, setActiveModerationReportId] = useState<string | null>(null);
   const [activeModerationSubmissionId, setActiveModerationSubmissionId] = useState<string | null>(null);
+  const [activeWithdrawalId, setActiveWithdrawalId] = useState<string | null>(null);
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueStreetAddress, setNewVenueStreetAddress] = useState('');
   const [newVenueCity, setNewVenueCity] = useState('');
@@ -330,6 +342,8 @@ export default function ScoutScreen() {
   const canContribute = Boolean(sessionEmail);
   const reviewQueueCount =
     pendingReports.length + pendingVenueSubmissions.length + pendingGameSubmissions.length;
+  const myPendingItemCount =
+    myPendingReports.length + myPendingVenueSubmissions.length + myPendingGameSubmissions.length;
   const duplicateSubmission = useMemo(() => {
     if (!selectedVenue || !selectedGame) {
       return null;
@@ -444,6 +458,7 @@ export default function ScoutScreen() {
       }
 
       let nextSessionRole: UserRole | null = null;
+      let nextSessionEmail: string | null = null;
 
       try {
         const [user, authSummary] = await Promise.all([
@@ -451,8 +466,10 @@ export default function ScoutScreen() {
           getAuthSessionSummary(),
         ]);
 
+        nextSessionEmail = user?.email ?? null;
+
         if (!cancelled) {
-          setSessionEmail(user?.email ?? null);
+          setSessionEmail(nextSessionEmail);
           setSessionRole(authSummary?.role ?? null);
         }
 
@@ -461,6 +478,30 @@ export default function ScoutScreen() {
         if (!cancelled) {
           setSessionEmail(null);
           setSessionRole(null);
+        }
+      }
+
+      if (nextSessionEmail) {
+        try {
+          const [
+            nextMyPendingReports,
+            nextMyPendingVenueSubmissions,
+            nextMyPendingGameSubmissions,
+          ] = await Promise.all([
+            listMyPendingScoutReports(),
+            listMyPendingVenueSubmissions(),
+            listMyPendingGameSubmissions(),
+          ]);
+
+          if (!cancelled) {
+            setMyPendingReports(nextMyPendingReports);
+            setMyPendingVenueSubmissions(nextMyPendingVenueSubmissions);
+            setMyPendingGameSubmissions(nextMyPendingGameSubmissions);
+          }
+        } catch {
+          if (!cancelled) {
+            setMyPendingMessage('Could not load your pending submissions.');
+          }
         }
       }
 
@@ -560,6 +601,34 @@ export default function ScoutScreen() {
       setQueueMessage('Could not refresh the pending review queue.');
     } finally {
       setIsLoadingQueue(false);
+    }
+  }
+
+  async function refreshMyPendingItems() {
+    if (!sessionEmail) {
+      return;
+    }
+
+    setIsLoadingMyPendingItems(true);
+
+    try {
+      const [
+        nextMyPendingReports,
+        nextMyPendingVenueSubmissions,
+        nextMyPendingGameSubmissions,
+      ] = await Promise.all([
+        listMyPendingScoutReports(),
+        listMyPendingVenueSubmissions(),
+        listMyPendingGameSubmissions(),
+      ]);
+
+      setMyPendingReports(nextMyPendingReports);
+      setMyPendingVenueSubmissions(nextMyPendingVenueSubmissions);
+      setMyPendingGameSubmissions(nextMyPendingGameSubmissions);
+    } catch {
+      setMyPendingMessage('Could not refresh your pending submissions.');
+    } finally {
+      setIsLoadingMyPendingItems(false);
     }
   }
 
@@ -786,6 +855,51 @@ export default function ScoutScreen() {
     }
   }
 
+  async function withdrawReport(reportId: string) {
+    setActiveWithdrawalId(reportId);
+    setMyPendingMessage(null);
+
+    try {
+      await withdrawScoutInventoryReport(reportId);
+      await refreshMyPendingItems();
+      setMyPendingMessage('Report withdrawn. You can submit a corrected version now.');
+    } catch (error) {
+      setMyPendingMessage(getScoutErrorMessage(error));
+    } finally {
+      setActiveWithdrawalId(null);
+    }
+  }
+
+  async function withdrawVenueReviewItem(submissionId: string) {
+    setActiveWithdrawalId(submissionId);
+    setMyPendingMessage(null);
+
+    try {
+      await withdrawVenueSubmission(submissionId);
+      await refreshMyPendingItems();
+      setMyPendingMessage('Venue submission withdrawn. You can submit a corrected version now.');
+    } catch (error) {
+      setMyPendingMessage(getScoutErrorMessage(error));
+    } finally {
+      setActiveWithdrawalId(null);
+    }
+  }
+
+  async function withdrawGameReviewItem(submissionId: string) {
+    setActiveWithdrawalId(submissionId);
+    setMyPendingMessage(null);
+
+    try {
+      await withdrawGameSubmission(submissionId);
+      await refreshMyPendingItems();
+      setMyPendingMessage('Game submission withdrawn. You can submit a corrected version now.');
+    } catch (error) {
+      setMyPendingMessage(getScoutErrorMessage(error));
+    } finally {
+      setActiveWithdrawalId(null);
+    }
+  }
+
   async function submitReport() {
     if (!sessionEmail) {
       setSubmitMessage('Sign in or create an account before submitting a report.');
@@ -840,14 +954,14 @@ export default function ScoutScreen() {
         `Submitted ${submittedGameTitle}. ${submittedVenueName} is still selected for the next cabinet.`,
       );
       resetReportDetails();
+      await refreshMyPendingItems();
 
       if (sessionRole === 'admin') {
         await refreshPendingReports();
       }
-    } catch {
-      setSubmitMessage(
-        'Report submission failed. Make sure you are signed in and try again.',
-      );
+    } catch (error) {
+      const detail = getScoutErrorMessage(error);
+      setSubmitMessage(detail);
     } finally {
       setIsSubmitting(false);
     }
@@ -911,6 +1025,7 @@ export default function ScoutScreen() {
         setNewVenueWebsite('');
         setNewVenueNotes('');
         setNewVenueMessage('Venue submitted for admin review. It will appear in search after approval.');
+        await refreshMyPendingItems();
         return;
       }
 
@@ -955,7 +1070,11 @@ export default function ScoutScreen() {
       setNewVenueMessage(`Saved ${createdVenue.name} and selected it for the next report.`);
     } catch (error) {
       const detail = getScoutErrorMessage(error);
-      setNewVenueMessage(`Could not create that venue yet: ${detail}`);
+      setNewVenueMessage(
+        sessionRole === 'admin'
+          ? `Could not create that venue yet: ${detail}`
+          : detail,
+      );
     } finally {
       setIsCreatingVenue(false);
     }
@@ -1017,6 +1136,7 @@ export default function ScoutScreen() {
         setNewGameAliases('');
         setNewGameCategories('');
         setNewGameMessage('Game submitted for admin review. It will appear in search after approval.');
+        await refreshMyPendingItems();
         return;
       }
 
@@ -1053,7 +1173,11 @@ export default function ScoutScreen() {
       setNewGameMessage(`Saved ${createdGame.title} and selected it for the next report.`);
     } catch (error) {
       const detail = getScoutErrorMessage(error);
-      setNewGameMessage(`Could not create that game yet: ${detail}`);
+      setNewGameMessage(
+        sessionRole === 'admin'
+          ? `Could not create that game yet: ${detail}`
+          : detail,
+      );
     } finally {
       setIsCreatingGame(false);
     }
@@ -1131,6 +1255,128 @@ export default function ScoutScreen() {
             </View>
           ) : null}
         </View>
+
+        {sessionEmail ? (
+          <View style={styles.panel}>
+            <View style={styles.queueHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>My pending submissions</Text>
+                <Text style={styles.queueHeaderMeta}>
+                  {myPendingItemCount} pending item{myPendingItemCount === 1 ? '' : 's'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => void refreshMyPendingItems()}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {isLoadingMyPendingItems ? 'Refreshing...' : 'Refresh'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {myPendingMessage ? (
+              <Text style={styles.helperMessage}>{myPendingMessage}</Text>
+            ) : null}
+
+            {isLoadingMyPendingItems ? (
+              <Text style={styles.emptyText}>Loading your pending submissions...</Text>
+            ) : myPendingItemCount > 0 ? (
+              <View style={styles.cardList}>
+                {myPendingReports.map((report) => (
+                  <View key={report.reportId} style={styles.queueCard}>
+                    <View style={styles.queueCardTop}>
+                      <Text style={styles.queueTitle}>{report.gameTitle}</Text>
+                      <Text style={styles.queueMeta}>{getPendingReportLabel(report.reportType)}</Text>
+                    </View>
+                    <Text style={styles.queueMeta}>
+                      {report.venueName} • Qty {report.quantity}
+                      {report.machineLabel ? ` • ${report.machineLabel}` : ''}
+                    </Text>
+                    {report.notes ? (
+                      <Text style={styles.queueNote}>{report.notes}</Text>
+                    ) : null}
+                    <View style={styles.queueActions}>
+                      <Pressable
+                        disabled={activeWithdrawalId === report.reportId}
+                        onPress={() => void withdrawReport(report.reportId)}
+                        style={[
+                          styles.queueActionButton,
+                          styles.queueRejectButton,
+                          activeWithdrawalId === report.reportId && styles.queueActionButtonDisabled,
+                        ]}
+                      >
+                        <Text style={styles.queueRejectButtonText}>
+                          {activeWithdrawalId === report.reportId ? 'Working...' : 'Withdraw'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+
+                {myPendingVenueSubmissions.map((submission) => (
+                  <View key={submission.submissionId} style={styles.queueCard}>
+                    <Text style={styles.queueTitle}>{submission.name}</Text>
+                    <Text style={styles.queueMeta}>
+                      Venue submission • {submission.streetAddress ? `${submission.streetAddress}, ` : ''}
+                      {submission.city}, {submission.region}
+                    </Text>
+                    {submission.notes ? (
+                      <Text style={styles.queueNote}>{submission.notes}</Text>
+                    ) : null}
+                    <View style={styles.queueActions}>
+                      <Pressable
+                        disabled={activeWithdrawalId === submission.submissionId}
+                        onPress={() => void withdrawVenueReviewItem(submission.submissionId)}
+                        style={[
+                          styles.queueActionButton,
+                          styles.queueRejectButton,
+                          activeWithdrawalId === submission.submissionId && styles.queueActionButtonDisabled,
+                        ]}
+                      >
+                        <Text style={styles.queueRejectButtonText}>
+                          {activeWithdrawalId === submission.submissionId ? 'Working...' : 'Withdraw'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+
+                {myPendingGameSubmissions.map((submission) => (
+                  <View key={submission.submissionId} style={styles.queueCard}>
+                    <Text style={styles.queueTitle}>{submission.title}</Text>
+                    <Text style={styles.queueMeta}>
+                      Game submission • {submission.manufacturer ?? 'Unknown manufacturer'}
+                      {submission.releaseYear ? ` • ${submission.releaseYear}` : ''}
+                    </Text>
+                    {submission.notes ? (
+                      <Text style={styles.queueNote}>{submission.notes}</Text>
+                    ) : null}
+                    <View style={styles.queueActions}>
+                      <Pressable
+                        disabled={activeWithdrawalId === submission.submissionId}
+                        onPress={() => void withdrawGameReviewItem(submission.submissionId)}
+                        style={[
+                          styles.queueActionButton,
+                          styles.queueRejectButton,
+                          activeWithdrawalId === submission.submissionId && styles.queueActionButtonDisabled,
+                        ]}
+                      >
+                        <Text style={styles.queueRejectButtonText}>
+                          {activeWithdrawalId === submission.submissionId ? 'Working...' : 'Withdraw'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>
+                You do not have any pending submissions right now.
+              </Text>
+            )}
+          </View>
+        ) : null}
 
         <View style={styles.grid}>
           <View style={[styles.panel, styles.formPanel]}>
