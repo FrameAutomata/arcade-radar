@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -7,27 +7,29 @@ import {
   TextInput,
   useWindowDimensions,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { theme } from '@/constants/theme';
+import { theme } from "@/constants/theme";
 import {
   getAuthSessionSummary,
   signInWithPassword,
   signOutCurrentUser,
+  signUpWithPassword,
   type AuthSessionSummary,
-} from '@/lib/auth';
-import { hasSupabaseCredentials } from '@/lib/env';
+} from "@/lib/auth";
+import { hasSupabaseCredentials } from "@/lib/env";
 
 export default function AuthScreen() {
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 1100;
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [session, setSession] = useState<AuthSessionSummary | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
 
   useEffect(() => {
     let cancelled = false;
@@ -40,12 +42,12 @@ export default function AuthScreen() {
 
         if (!cancelled) {
           setSession(nextSession);
-          setEmail(nextSession?.email ?? '');
+          setEmail(nextSession?.email ?? "");
         }
       } catch {
         if (!cancelled) {
           setStatusMessage(
-            'Could not read the current account session. Try again in a moment.',
+            "Could not read the current account session. Try again in a moment.",
           );
         }
       } finally {
@@ -64,7 +66,7 @@ export default function AuthScreen() {
 
   async function handleSignIn() {
     if (!email.trim() || !password) {
-      setStatusMessage('Enter both your email and password to sign in.');
+      setStatusMessage("Enter both your email and password to sign in.");
       return;
     }
 
@@ -75,15 +77,55 @@ export default function AuthScreen() {
       await signInWithPassword(email, password);
       const nextSession = await getAuthSessionSummary();
       setSession(nextSession);
-      setPassword('');
+      setPassword("");
       setStatusMessage(
         nextSession?.role
           ? `Signed in as ${nextSession.email} (${nextSession.role}).`
           : `Signed in as ${nextSession?.email ?? email.trim()}, but no scout/admin role is assigned yet.`,
       );
     } catch {
+      setStatusMessage("Sign-in failed. Double-check your email and password.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleRegister() {
+    if (!email.trim() || !password) {
       setStatusMessage(
-        'Sign-in failed. Double-check your email and password.',
+        "Enter both your email and password to create an account.",
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      setStatusMessage("Use a password with at least 6 characters.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatusMessage(null);
+
+    try {
+      const result = await signUpWithPassword(email, password);
+      setPassword("");
+
+      if (!result.session) {
+        setSession(null);
+        setStatusMessage(
+          "Account created. Check your email to confirm it, then sign in.",
+        );
+        return;
+      }
+
+      const nextSession = await getAuthSessionSummary();
+      setSession(nextSession);
+      setStatusMessage(
+        `Account created and signed in as ${result.user?.email ?? email.trim()}.`,
+      );
+    } catch (error) {
+      setStatusMessage(
+        error instanceof Error ? error.message : "Registration failed.",
       );
     } finally {
       setIsSubmitting(false);
@@ -97,17 +139,17 @@ export default function AuthScreen() {
     try {
       await signOutCurrentUser();
       setSession(null);
-      setPassword('');
-      setStatusMessage('Signed out.');
+      setPassword("");
+      setStatusMessage("Signed out.");
     } catch {
-      setStatusMessage('Could not sign out right now.');
+      setStatusMessage("Could not sign out right now.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -128,16 +170,20 @@ export default function AuthScreen() {
           <Text style={styles.sectionTitle}>Current session</Text>
 
           {isLoadingSession ? (
-            <Text style={styles.helperText}>Checking your current auth session...</Text>
+            <Text style={styles.helperText}>
+              Checking your current auth session...
+            </Text>
           ) : session ? (
             <View style={styles.sessionCard}>
-              <Text style={styles.sessionValue}>{session.email ?? 'Signed-in user'}</Text>
-              <Text style={styles.sessionMeta}>Access: {session.role ?? 'viewer'}</Text>
+              <Text style={styles.sessionValue}>
+                {session.email ?? "Signed-in user"}
+              </Text>
+              <Text style={styles.sessionMeta}>
+                Access: {session.role ?? "contributor"}
+              </Text>
             </View>
           ) : (
-            <Text style={styles.helperText}>
-              No account is signed in yet.
-            </Text>
+            <Text style={styles.helperText}>No account is signed in yet.</Text>
           )}
 
           {!hasSupabaseCredentials ? (
@@ -146,7 +192,9 @@ export default function AuthScreen() {
             </Text>
           ) : null}
 
-          {statusMessage ? <Text style={styles.statusText}>{statusMessage}</Text> : null}
+          {statusMessage ? (
+            <Text style={styles.statusText}>{statusMessage}</Text>
+          ) : null}
         </View>
 
         <View style={styles.panel}>
@@ -160,16 +208,58 @@ export default function AuthScreen() {
               <Pressable
                 disabled={isSubmitting}
                 onPress={() => void handleSignOut()}
-                style={[styles.secondaryButton, isSubmitting && styles.buttonMuted]}
+                style={[
+                  styles.secondaryButton,
+                  isSubmitting && styles.buttonMuted,
+                ]}
               >
                 <Text style={styles.secondaryButtonText}>
-                  {isSubmitting ? 'Working...' : 'Sign out'}
+                  {isSubmitting ? "Working..." : "Sign out"}
                 </Text>
               </Pressable>
             </>
           ) : (
             <>
-              <Text style={styles.sectionTitle}>Email and password</Text>
+              <View style={styles.modeRow}>
+                <Pressable
+                  onPress={() => setAuthMode("sign-in")}
+                  style={[
+                    styles.modeButton,
+                    authMode === "sign-in" && styles.modeButtonActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.modeButtonText,
+                      authMode === "sign-in" && styles.modeButtonTextActive,
+                    ]}
+                  >
+                    Sign in
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setAuthMode("register")}
+                  style={[
+                    styles.modeButton,
+                    authMode === "register" && styles.modeButtonActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.modeButtonText,
+                      authMode === "register" && styles.modeButtonTextActive,
+                    ]}
+                  >
+                    Register
+                  </Text>
+                </Pressable>
+              </View>
+
+              <Text style={styles.sectionTitle}>
+                {authMode === "register"
+                  ? "Create account"
+                  : "Email and password"}
+              </Text>
 
               <TextInput
                 autoCapitalize="none"
@@ -195,11 +285,23 @@ export default function AuthScreen() {
 
               <Pressable
                 disabled={isSubmitting || !hasSupabaseCredentials}
-                onPress={() => void handleSignIn()}
-                style={[styles.primaryButton, (isSubmitting || !hasSupabaseCredentials) && styles.buttonMuted]}
+                onPress={() =>
+                  authMode === "register"
+                    ? void handleRegister()
+                    : void handleSignIn()
+                }
+                style={[
+                  styles.primaryButton,
+                  (isSubmitting || !hasSupabaseCredentials) &&
+                    styles.buttonMuted,
+                ]}
               >
                 <Text style={styles.primaryButtonText}>
-                  {isSubmitting ? 'Working...' : 'Sign in'}
+                  {isSubmitting
+                    ? "Working..."
+                    : authMode === "register"
+                      ? "Create account"
+                      : "Sign in"}
                 </Text>
               </Pressable>
             </>
@@ -221,9 +323,9 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   contentWide: {
-    alignSelf: 'center',
+    alignSelf: "center",
     maxWidth: 1440,
-    width: '100%',
+    width: "100%",
   },
   hero: {
     backgroundColor: theme.colors.surfaceGlass,
@@ -231,16 +333,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     gap: theme.spacing.sm,
-    overflow: 'hidden',
+    overflow: "hidden",
     padding: theme.spacing.lg,
-    position: 'relative',
+    position: "relative",
   },
   heroGlow: {
     backgroundColor: theme.colors.highlight,
     borderRadius: 999,
     height: 150,
     opacity: 0.1,
-    position: 'absolute',
+    position: "absolute",
     right: -24,
     top: -36,
     width: 150,
@@ -248,14 +350,14 @@ const styles = StyleSheet.create({
   eyebrow: {
     color: theme.colors.brandMuted,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 1.8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   title: {
     color: theme.colors.textPrimary,
     fontSize: 34,
-    fontWeight: '800',
+    fontWeight: "800",
     lineHeight: 38,
   },
   description: {
@@ -274,7 +376,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: theme.colors.textPrimary,
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   helperText: {
     color: theme.colors.textSecondary,
@@ -302,7 +404,7 @@ const styles = StyleSheet.create({
   sessionValue: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   sessionMeta: {
     color: theme.colors.textSecondary,
@@ -318,8 +420,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
   },
+  modeRow: {
+    backgroundColor: "rgba(8, 15, 30, 0.64)",
+    borderColor: theme.colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 4,
+    padding: 4,
+  },
+  modeButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  modeButtonActive: {
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  modeButtonText: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  modeButtonTextActive: {
+    color: theme.colors.textPrimary,
+  },
   primaryButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: theme.colors.brand,
     borderRadius: theme.radius.sm,
     paddingHorizontal: theme.spacing.md,
@@ -328,10 +457,10 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: theme.colors.textOnBrand,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   secondaryButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: theme.colors.surfaceMuted,
     borderColor: theme.colors.accentMuted,
     borderRadius: theme.radius.sm,
@@ -342,7 +471,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: theme.colors.textPrimary,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   buttonMuted: {
     opacity: 0.6,

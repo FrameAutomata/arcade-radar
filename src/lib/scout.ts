@@ -56,6 +56,64 @@ interface CreatedScoutGameResult {
   categories: string[];
 }
 
+interface SubmittedVenueSubmissionResult {
+  submissionId: string;
+  submissionStatus: string;
+}
+
+interface SubmittedGameSubmissionResult {
+  submissionId: string;
+  submissionStatus: string;
+}
+
+interface PendingVenueSubmission {
+  submissionId: string;
+  submittedBy: string;
+  name: string;
+  streetAddress: string | null;
+  city: string;
+  region: string;
+  postalCode: string | null;
+  country: string;
+  latitude: number;
+  longitude: number;
+  website: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+interface PendingGameSubmission {
+  submissionId: string;
+  submittedBy: string;
+  title: string;
+  manufacturer: string | null;
+  releaseYear: number | null;
+  aliases: string[];
+  categories: string[];
+  notes: string | null;
+  createdAt: string;
+}
+
+interface ApprovedVenueSubmissionResult {
+  submissionId: string;
+  createdVenueId: string;
+  createdVenueSlug: string;
+  createdVenueName: string;
+}
+
+interface ApprovedGameSubmissionResult {
+  submissionId: string;
+  createdGameId: string;
+  createdGameSlug: string;
+  createdGameTitle: string;
+}
+
+interface RejectedSubmissionResult {
+  submissionId: string;
+  submissionStatus: string;
+  reviewedAt: string;
+}
+
 interface ApprovedInventoryReportResult {
   reportId: string;
   venueGameId: string;
@@ -277,6 +335,110 @@ export async function createScoutGame(input: {
   };
 }
 
+export async function submitScoutVenueSubmission(input: {
+  name: string;
+  streetAddress: string;
+  city: string;
+  region: string;
+  postalCode?: string;
+  country?: string;
+  latitude: number;
+  longitude: number;
+  website?: string;
+  notes?: string;
+}): Promise<SubmittedVenueSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'submit_venue_submission' as never,
+    {
+      venue_name: input.name.trim(),
+      venue_street_address: input.streetAddress.trim(),
+      venue_city: input.city.trim(),
+      venue_region: input.region.trim(),
+      venue_postal_code: input.postalCode?.trim() || null,
+      venue_country: input.country?.trim() || 'US',
+      venue_latitude: input.latitude,
+      venue_longitude: input.longitude,
+      venue_website: input.website?.trim() || null,
+      venue_notes: input.notes?.trim() || null,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        submission_status: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    submissionId: firstRow.submission_id,
+    submissionStatus: firstRow.submission_status,
+  };
+}
+
+export async function submitScoutGameSubmission(input: {
+  title: string;
+  manufacturer?: string;
+  releaseYear?: number | null;
+  aliases?: string[];
+  categories?: string[];
+  notes?: string;
+}): Promise<SubmittedGameSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'submit_game_submission' as never,
+    {
+      game_title: input.title.trim(),
+      game_manufacturer: input.manufacturer?.trim() || null,
+      game_release_year: input.releaseYear ?? null,
+      game_aliases:
+        input.aliases
+          ?.map((alias) => alias.trim())
+          .filter(Boolean) ?? [],
+      game_categories:
+        input.categories
+          ?.map((category) => category.trim())
+          .filter(Boolean) ?? [],
+      game_notes: input.notes?.trim() || null,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        submission_status: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    submissionId: firstRow.submission_id,
+    submissionStatus: firstRow.submission_status,
+  };
+}
+
 export async function searchScoutGames(query: string): Promise<Game[]> {
   return searchGamesLive(query, 8);
 }
@@ -433,11 +595,254 @@ export async function rejectScoutInventoryReport(
   };
 }
 
+export async function listPendingVenueSubmissions(): Promise<PendingVenueSubmission[]> {
+  if (!hasSupabaseCredentials || !supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc(
+    'list_pending_venue_submissions' as never,
+    {} as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    submission_id: string;
+    submitted_by: string;
+    name: string;
+    street_address: string | null;
+    city: string;
+    region: string;
+    postal_code: string | null;
+    country: string;
+    latitude: number;
+    longitude: number;
+    website: string | null;
+    notes: string | null;
+    created_at: string;
+  }>).map((row) => ({
+    city: row.city,
+    country: row.country,
+    createdAt: row.created_at,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    name: row.name,
+    notes: row.notes,
+    postalCode: row.postal_code,
+    region: row.region,
+    streetAddress: row.street_address,
+    submissionId: row.submission_id,
+    submittedBy: row.submitted_by,
+    website: row.website,
+  }));
+}
+
+export async function listPendingGameSubmissions(): Promise<PendingGameSubmission[]> {
+  if (!hasSupabaseCredentials || !supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc(
+    'list_pending_game_submissions' as never,
+    {} as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    submission_id: string;
+    submitted_by: string;
+    title: string;
+    manufacturer: string | null;
+    release_year: number | null;
+    aliases: string[];
+    categories: string[];
+    notes: string | null;
+    created_at: string;
+  }>).map((row) => ({
+    aliases: row.aliases,
+    categories: row.categories,
+    createdAt: row.created_at,
+    manufacturer: row.manufacturer,
+    notes: row.notes,
+    releaseYear: row.release_year,
+    submissionId: row.submission_id,
+    submittedBy: row.submitted_by,
+    title: row.title,
+  }));
+}
+
+export async function approveVenueSubmission(
+  submissionId: string,
+): Promise<ApprovedVenueSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'approve_venue_submission' as never,
+    {
+      selected_submission_id: submissionId,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        created_venue_id: string;
+        created_venue_slug: string;
+        created_venue_name: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    createdVenueId: firstRow.created_venue_id,
+    createdVenueName: firstRow.created_venue_name,
+    createdVenueSlug: firstRow.created_venue_slug,
+    submissionId: firstRow.submission_id,
+  };
+}
+
+export async function rejectVenueSubmission(
+  submissionId: string,
+): Promise<RejectedSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'reject_venue_submission' as never,
+    {
+      selected_submission_id: submissionId,
+      rejection_reason: null,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        submission_status: string;
+        reviewed_at: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    reviewedAt: firstRow.reviewed_at,
+    submissionId: firstRow.submission_id,
+    submissionStatus: firstRow.submission_status,
+  };
+}
+
+export async function approveGameSubmission(
+  submissionId: string,
+): Promise<ApprovedGameSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'approve_game_submission' as never,
+    {
+      selected_submission_id: submissionId,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        created_game_id: string;
+        created_game_slug: string;
+        created_game_title: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    createdGameId: firstRow.created_game_id,
+    createdGameSlug: firstRow.created_game_slug,
+    createdGameTitle: firstRow.created_game_title,
+    submissionId: firstRow.submission_id,
+  };
+}
+
+export async function rejectGameSubmission(
+  submissionId: string,
+): Promise<RejectedSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'reject_game_submission' as never,
+    {
+      selected_submission_id: submissionId,
+      rejection_reason: null,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        submission_status: string;
+        reviewed_at: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    reviewedAt: firstRow.reviewed_at,
+    submissionId: firstRow.submission_id,
+    submissionStatus: firstRow.submission_status,
+  };
+}
+
 export type {
+  ApprovedGameSubmissionResult,
   ApprovedInventoryReportResult,
+  ApprovedVenueSubmissionResult,
   CreatedScoutGameResult,
   CreatedScoutVenueResult,
+  PendingGameSubmission,
   PendingInventoryReport,
+  PendingVenueSubmission,
+  RejectedSubmissionResult,
   RejectedInventoryReportResult,
   ScoutVenue,
+  SubmittedGameSubmissionResult,
+  SubmittedVenueSubmissionResult,
 };
