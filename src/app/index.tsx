@@ -1,10 +1,11 @@
 import * as Location from "expo-location";
-import { Link, useFocusEffect } from "expo-router";
+import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   startTransition,
 } from "react";
@@ -44,6 +45,10 @@ const DISTANCE_FILTERS_MILES = [10, 25, 50, 100, 250] as const;
 const DEFAULT_DISTANCE_FILTER_MILES = 50;
 
 export default function HomeScreen() {
+  const params = useLocalSearchParams<{
+    game?: string;
+    location?: string;
+  }>();
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 1100;
   const [isMapInteracting, setIsMapInteracting] = useState(false);
@@ -67,6 +72,7 @@ export default function HomeScreen() {
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
   const [authSession, setAuthSession] = useState<AuthSessionSummary | null>(null);
+  const appliedDemoParamsRef = useRef<string | null>(null);
   const deferredQuery = useDeferredValue(searchQuery);
 
   const game = selectedGame;
@@ -146,6 +152,46 @@ export default function HomeScreen() {
   useEffect(() => {
     let cancelled = false;
 
+    async function applyInitialDeviceLocation() {
+      if (Platform.OS === "web") {
+        return;
+      }
+
+      try {
+        const existingPermission = await Location.getForegroundPermissionsAsync();
+
+        if (existingPermission.status !== "granted") {
+          return;
+        }
+
+        const currentPosition = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        if (!cancelled) {
+          setUserLocation({
+            latitude: currentPosition.coords.latitude,
+            longitude: currentPosition.coords.longitude,
+          });
+          setLocationLabel("Using your current location");
+        }
+      } catch {
+        if (!cancelled) {
+          setLocationLabel(demoLocationLabel);
+        }
+      }
+    }
+
+    void applyInitialDeviceLocation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function loadSuggestions() {
       const normalizedQuery = deferredQuery.trim();
 
@@ -209,6 +255,72 @@ export default function HomeScreen() {
       cancelled = true;
     };
   }, [distanceFilterMiles, game, userLocation]);
+
+  useEffect(() => {
+    const paramLocation = typeof params.location === "string" ? params.location.trim() : "";
+    const paramGame = typeof params.game === "string" ? params.game.trim() : "";
+    const paramKey = `${paramLocation}|${paramGame}`;
+
+    if ((!paramLocation && !paramGame) || appliedDemoParamsRef.current === paramKey) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function applyDemoParams() {
+      appliedDemoParamsRef.current = paramKey;
+
+      if (paramLocation) {
+        setManualLocationQuery(paramLocation);
+        setLocationError(null);
+        setIsApplyingManualLocation(true);
+
+        try {
+          const manualLocation = await resolveAppLocation(paramLocation);
+
+          if (!cancelled && manualLocation) {
+            setUserLocation(manualLocation.coordinates);
+            setLocationLabel(manualLocation.label);
+          } else if (!cancelled) {
+            setLocationError("Could not find that demo ZIP code yet.");
+          }
+        } catch {
+          if (!cancelled) {
+            setLocationError("Could not apply that demo ZIP code right now.");
+          }
+        } finally {
+          if (!cancelled) {
+            setIsApplyingManualLocation(false);
+          }
+        }
+      }
+
+      if (paramGame) {
+        startTransition(() => {
+          setSearchQuery(paramGame);
+          setSelectedGame(null);
+        });
+
+        try {
+          const [matchedGame] = await searchGamesLive(paramGame, 1);
+
+          if (!cancelled && matchedGame) {
+            selectGame(matchedGame);
+          }
+        } catch {
+          if (!cancelled) {
+            setResultsError("Demo game search is not available right now.");
+          }
+        }
+      }
+    }
+
+    void applyDemoParams();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.game, params.location]);
 
   const pins = [
     {
@@ -342,6 +454,11 @@ export default function HomeScreen() {
         scrollEnabled={Platform.OS === "web" ? true : !isMapInteracting}
       >
         <View style={styles.topActions}>
+          <Link href="./demo" asChild>
+            <Pressable style={scoutLinkStyle}>
+              <Text style={styles.navButtonText}>Demo</Text>
+            </Pressable>
+          </Link>
           <Link href="./scout" asChild>
             <Pressable style={scoutLinkStyle}>
               <Text style={styles.navButtonText}>Scout</Text>

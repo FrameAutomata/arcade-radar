@@ -51,6 +51,36 @@ eas build --platform android
 eas build --platform ios
 ```
 
+## Demo Deployment
+
+For mixer demos, use the stable EAS alias instead of one-off deploy URLs:
+
+```bash
+npx eas-cli@latest deploy --alias demo
+```
+
+Use this URL for QR codes and Supabase Auth redirects:
+
+```text
+https://arcade-radar--demo.expo.app/
+```
+
+Supabase Auth settings:
+
+- Site URL: `https://arcade-radar--demo.expo.app/`
+- Redirect URL: `https://arcade-radar--demo.expo.app/**`
+
+The app includes a demo page at `/demo` with a short pitch, demo flow, and pre-demo checklist.
+
+## Mixer Demo Checklist
+
+- Seed 5-8 DFW venues with recognizable games.
+- Verify search by ZIP/address, game filter, map pin, venue detail, and directions.
+- Create one contributor test account and one admin account.
+- Submit one inventory report as contributor, then approve it as admin.
+- Test the demo alias on mobile data and desktop Wi-Fi.
+- Keep backup screenshots in case venue Wi-Fi misbehaves.
+
 ## Apply The Initial Schema
 
 Run the SQL in `supabase/migrations/0001_initial_schema.sql` in the Supabase SQL editor, or use the Supabase CLI if you have it configured.

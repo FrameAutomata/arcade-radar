@@ -8,8 +8,8 @@ import type {
 } from '@/types/domain';
 
 export const defaultUserLocation = {
-  latitude: 41.9295,
-  longitude: -87.7071,
+  latitude: 32.7767,
+  longitude: -96.797,
 };
 
 export const games: Game[] = [
