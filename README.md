@@ -51,6 +51,46 @@ eas build --platform android
 eas build --platform ios
 ```
 
+## Testing
+
+Local quality checks:
+
+```bash
+npm run check
+```
+
+This runs:
+
+- `npm run typecheck`
+- `npm run test:ci`
+
+Web export smoke test:
+
+```bash
+npm run build:web
+```
+
+Current test coverage starts with pure unit tests for formatting, distance/map
+region calculations, and search helpers. The web export step acts as a lightweight
+integration smoke test for Expo Router and the web bundle.
+
+## CI/CD
+
+GitHub Actions workflows live in `.github/workflows`.
+
+- `CI`: runs on pull requests and pushes to `main`.
+- `Deploy Demo`: manual workflow that typechecks, tests, then deploys the EAS
+  Hosting `demo` alias.
+
+Required GitHub repository secrets:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_KEY`
+- `EXPO_TOKEN` for the manual EAS demo deploy workflow
+
+The CI workflow uses `npm install` instead of `npm ci` because this project
+currently ignores `package-lock.json`.
+
 ## Demo Deployment
 
 For mixer demos, use the stable EAS alias instead of one-off deploy URLs:
