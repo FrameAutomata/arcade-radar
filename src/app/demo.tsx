@@ -80,34 +80,30 @@ export default function DemoScreen() {
               </Pressable>
             </Link>
           </View>
-        </View>
 
-        <View style={styles.panel}>
-          <Text style={styles.sectionTitle}>Featured demo searches</Text>
-          <Text style={styles.helperText}>
-            Use these one-tap paths while presenting. They prefill location and
-            game search so you can get to the map quickly.
-          </Text>
-          <View style={styles.demoSearchGrid}>
-            {featuredDemoSearches.map((search) => (
-              <Link
-                key={search.title}
-                href={{
-                  pathname: "/",
-                  params: {
-                    game: search.game,
-                    location: search.location,
-                  },
-                }}
-                asChild
-              >
-                <Pressable style={styles.demoSearchCard}>
-                  <Text style={styles.demoSearchTitle}>{search.title}</Text>
-                  <Text style={styles.demoSearchMeta}>{search.game}</Text>
-                  <Text style={styles.demoSearchMeta}>Near {search.location}</Text>
-                </Pressable>
-              </Link>
-            ))}
+          <View style={styles.heroDemoSearches}>
+            <Text style={styles.heroSearchTitle}>One-tap demo searches</Text>
+            <View style={styles.demoSearchGrid}>
+              {featuredDemoSearches.map((search) => (
+                <Link
+                  key={search.title}
+                  href={{
+                    pathname: "/",
+                    params: {
+                      game: search.game,
+                      location: search.location,
+                    },
+                  }}
+                  asChild
+                >
+                  <Pressable style={styles.demoSearchCard}>
+                    <Text style={styles.demoSearchTitle}>{search.title}</Text>
+                    <Text style={styles.demoSearchMeta}>{search.game}</Text>
+                    <Text style={styles.demoSearchMeta}>Near {search.location}</Text>
+                  </Pressable>
+                </Link>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -365,6 +361,22 @@ const styles = StyleSheet.create({
   },
   demoSearchGrid: {
     gap: theme.spacing.sm,
+  },
+  heroDemoSearches: {
+    backgroundColor: "rgba(8, 15, 30, 0.54)",
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+    padding: theme.spacing.md,
+  },
+  heroSearchTitle: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
   demoSearchCard: {
     backgroundColor: theme.colors.surfaceMuted,

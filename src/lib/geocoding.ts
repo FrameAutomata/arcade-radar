@@ -15,27 +15,27 @@ const presetLocations: Array<{
 }> = [
   {
     coordinates: {
-      latitude: 41.9295,
-      longitude: -87.7071,
+      latitude: 32.7767,
+      longitude: -96.797,
     },
-    label: 'Logan Square, Chicago, IL',
-    terms: ['60647', 'logan square', 'chicago', 'illinois'],
+    label: 'Dallas, TX 75201',
+    terms: ['75201', 'dallas', 'downtown dallas', 'dfw'],
   },
   {
     coordinates: {
-      latitude: 41.8211,
-      longitude: -87.8439,
+      latitude: 32.7357,
+      longitude: -97.1081,
     },
-    label: 'Brookfield, IL 60513',
-    terms: ['60513', 'brookfield', 'ogden ave'],
+    label: 'Arlington, TX 76011',
+    terms: ['76011', 'arlington', 'arlington tx'],
   },
   {
     coordinates: {
-      latitude: 41.8975,
-      longitude: -87.6347,
+      latitude: 32.9668,
+      longitude: -97.038,
     },
-    label: 'River North, Chicago, IL',
-    terms: ['60654', 'river north', 'downtown chicago'],
+    label: 'Grapevine, TX 76051',
+    terms: ['76051', 'grapevine', 'grapevine mills'],
   },
 ];
 

@@ -5,6 +5,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   startTransition,
 } from "react";
@@ -71,7 +72,7 @@ export default function HomeScreen() {
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
   const [authSession, setAuthSession] = useState<AuthSessionSummary | null>(null);
-  const [appliedDemoParams, setAppliedDemoParams] = useState<string | null>(null);
+  const appliedDemoParamsRef = useRef<string | null>(null);
   const deferredQuery = useDeferredValue(searchQuery);
 
   const game = selectedGame;
@@ -151,6 +152,46 @@ export default function HomeScreen() {
   useEffect(() => {
     let cancelled = false;
 
+    async function applyInitialDeviceLocation() {
+      if (Platform.OS === "web") {
+        return;
+      }
+
+      try {
+        const existingPermission = await Location.getForegroundPermissionsAsync();
+
+        if (existingPermission.status !== "granted") {
+          return;
+        }
+
+        const currentPosition = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        if (!cancelled) {
+          setUserLocation({
+            latitude: currentPosition.coords.latitude,
+            longitude: currentPosition.coords.longitude,
+          });
+          setLocationLabel("Using your current location");
+        }
+      } catch {
+        if (!cancelled) {
+          setLocationLabel(demoLocationLabel);
+        }
+      }
+    }
+
+    void applyInitialDeviceLocation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     async function loadSuggestions() {
       const normalizedQuery = deferredQuery.trim();
 
@@ -220,14 +261,14 @@ export default function HomeScreen() {
     const paramGame = typeof params.game === "string" ? params.game.trim() : "";
     const paramKey = `${paramLocation}|${paramGame}`;
 
-    if ((!paramLocation && !paramGame) || appliedDemoParams === paramKey) {
+    if ((!paramLocation && !paramGame) || appliedDemoParamsRef.current === paramKey) {
       return;
     }
 
     let cancelled = false;
 
     async function applyDemoParams() {
-      setAppliedDemoParams(paramKey);
+      appliedDemoParamsRef.current = paramKey;
 
       if (paramLocation) {
         setManualLocationQuery(paramLocation);
@@ -240,6 +281,12 @@ export default function HomeScreen() {
           if (!cancelled && manualLocation) {
             setUserLocation(manualLocation.coordinates);
             setLocationLabel(manualLocation.label);
+          } else if (!cancelled) {
+            setLocationError("Could not find that demo ZIP code yet.");
+          }
+        } catch {
+          if (!cancelled) {
+            setLocationError("Could not apply that demo ZIP code right now.");
           }
         } finally {
           if (!cancelled) {
@@ -273,7 +320,7 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [appliedDemoParams, params.game, params.location]);
+  }, [params.game, params.location]);
 
   const pins = [
     {

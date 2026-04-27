@@ -8,7 +8,7 @@ import {
 import { buildMapRegion, type Coordinates } from '@/lib/geo';
 import type { Game, NearbyVenueResult } from '@/types/domain';
 
-export const demoLocationLabel = 'Logan Square demo location';
+export const demoLocationLabel = 'DFW demo location';
 
 export function sanitizeCoordinates(
   latitude?: string | string[],

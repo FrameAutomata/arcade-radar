@@ -305,7 +305,7 @@ export default function VenueDetailsScreen() {
               <Text style={styles.primaryActionText}>Get directions</Text>
             </Pressable>
             <Pressable onPress={openScoutForVenue} style={styles.secondaryAction}>
-              <Text style={styles.secondaryActionText}>Scout this venue</Text>
+              <Text style={styles.secondaryActionText}>Report inventory</Text>
             </Pressable>
           </View>
 
@@ -315,6 +315,24 @@ export default function VenueDetailsScreen() {
               <Text style={styles.metaLabel}>community confirmations</Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.ctaPanel}>
+          <Pressable onPress={openVenueDirections} style={styles.ctaCardPrimary}>
+            <Text style={styles.ctaEyebrow}>Go now</Text>
+            <Text style={styles.ctaTitle}>Open directions</Text>
+            <Text style={styles.ctaText}>Launch your maps app with this venue address.</Text>
+          </Pressable>
+          <Pressable onPress={openScoutForVenue} style={styles.ctaCard}>
+            <Text style={styles.ctaEyebrow}>Contribute</Text>
+            <Text style={styles.ctaTitle}>Add inventory report</Text>
+            <Text style={styles.ctaText}>Submit a cabinet you saw here for review.</Text>
+          </Pressable>
+          <Pressable onPress={openScoutForVenue} style={styles.ctaCard}>
+            <Text style={styles.ctaEyebrow}>Status check</Text>
+            <Text style={styles.ctaTitle}>Report game status</Text>
+            <Text style={styles.ctaText}>Mark games as working, missing, or under maintenance.</Text>
+          </Pressable>
         </View>
 
         <View
@@ -546,7 +564,7 @@ export default function VenueDetailsScreen() {
                       ]}
                     >
                       <Text style={styles.detailsToggleText}>
-                        {isExpanded ? "Hide" : "Details"}
+                        {isExpanded ? "Hide report options" : "Report / details"}
                       </Text>
                     </Pressable>
                     {isExpanded ? (
@@ -707,6 +725,42 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  ctaPanel: {
+    gap: theme.spacing.sm,
+  },
+  ctaCard: {
+    backgroundColor: theme.colors.surfaceGlass,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: 4,
+    padding: theme.spacing.md,
+  },
+  ctaCardPrimary: {
+    backgroundColor: "rgba(255, 138, 31, 0.14)",
+    borderColor: theme.colors.brand,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    gap: 4,
+    padding: theme.spacing.md,
+  },
+  ctaEyebrow: {
+    color: theme.colors.accentMuted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  ctaTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  ctaText: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
   },
   panel: {
     backgroundColor: theme.colors.surfaceGlass,
