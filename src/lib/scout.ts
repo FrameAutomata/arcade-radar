@@ -94,6 +94,12 @@ interface PendingGameSubmission {
   createdAt: string;
 }
 
+interface WithdrawnInventoryReportResult {
+  reportId: string;
+  reportStatus: Database['public']['Tables']['inventory_reports']['Row']['status'];
+  withdrawnAt: string;
+}
+
 interface ApprovedVenueSubmissionResult {
   submissionId: string;
   createdVenueId: string;
@@ -112,6 +118,12 @@ interface RejectedSubmissionResult {
   submissionId: string;
   submissionStatus: string;
   reviewedAt: string;
+}
+
+interface WithdrawnSubmissionResult {
+  submissionId: string;
+  submissionStatus: string;
+  withdrawnAt: string;
 }
 
 interface ApprovedInventoryReportResult {
@@ -517,6 +529,49 @@ export async function listPendingScoutReports(): Promise<PendingInventoryReport[
   }));
 }
 
+export async function listMyPendingScoutReports(): Promise<PendingInventoryReport[]> {
+  if (!hasSupabaseCredentials || !supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc(
+    'list_my_pending_inventory_reports' as never,
+    {} as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    report_id: string;
+    venue_game_id: string | null;
+    venue_id: string;
+    venue_name: string;
+    game_id: string;
+    game_title: string;
+    report_type: string;
+    quantity: number;
+    machine_label: string | null;
+    notes: string | null;
+    created_at: string;
+    submitted_by: string;
+  }>).map((row) => ({
+    createdAt: row.created_at,
+    gameId: row.game_id,
+    gameTitle: row.game_title,
+    machineLabel: row.machine_label,
+    notes: row.notes,
+    quantity: row.quantity,
+    reportId: row.report_id,
+    reportType: row.report_type,
+    submittedBy: row.submitted_by,
+    venueGameId: row.venue_game_id,
+    venueId: row.venue_id,
+    venueName: row.venue_name,
+  }));
+}
+
 export async function approveScoutInventoryReport(
   reportId: string,
 ): Promise<ApprovedInventoryReportResult | null> {
@@ -640,6 +695,51 @@ export async function listPendingVenueSubmissions(): Promise<PendingVenueSubmiss
   }));
 }
 
+export async function listMyPendingVenueSubmissions(): Promise<PendingVenueSubmission[]> {
+  if (!hasSupabaseCredentials || !supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc(
+    'list_my_pending_venue_submissions' as never,
+    {} as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    submission_id: string;
+    submitted_by: string;
+    name: string;
+    street_address: string | null;
+    city: string;
+    region: string;
+    postal_code: string | null;
+    country: string;
+    latitude: number;
+    longitude: number;
+    website: string | null;
+    notes: string | null;
+    created_at: string;
+  }>).map((row) => ({
+    city: row.city,
+    country: row.country,
+    createdAt: row.created_at,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    name: row.name,
+    notes: row.notes,
+    postalCode: row.postal_code,
+    region: row.region,
+    streetAddress: row.street_address,
+    submissionId: row.submission_id,
+    submittedBy: row.submitted_by,
+    website: row.website,
+  }));
+}
+
 export async function listPendingGameSubmissions(): Promise<PendingGameSubmission[]> {
   if (!hasSupabaseCredentials || !supabase) {
     return [];
@@ -675,6 +775,154 @@ export async function listPendingGameSubmissions(): Promise<PendingGameSubmissio
     submittedBy: row.submitted_by,
     title: row.title,
   }));
+}
+
+export async function listMyPendingGameSubmissions(): Promise<PendingGameSubmission[]> {
+  if (!hasSupabaseCredentials || !supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc(
+    'list_my_pending_game_submissions' as never,
+    {} as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    submission_id: string;
+    submitted_by: string;
+    title: string;
+    manufacturer: string | null;
+    release_year: number | null;
+    aliases: string[];
+    categories: string[];
+    notes: string | null;
+    created_at: string;
+  }>).map((row) => ({
+    aliases: row.aliases,
+    categories: row.categories,
+    createdAt: row.created_at,
+    manufacturer: row.manufacturer,
+    notes: row.notes,
+    releaseYear: row.release_year,
+    submissionId: row.submission_id,
+    submittedBy: row.submitted_by,
+    title: row.title,
+  }));
+}
+
+export async function withdrawScoutInventoryReport(
+  reportId: string,
+): Promise<WithdrawnInventoryReportResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'withdraw_inventory_report' as never,
+    {
+      selected_report_id: reportId,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        report_id: string;
+        report_status: Database['public']['Tables']['inventory_reports']['Row']['status'];
+        withdrawn_at: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    reportId: firstRow.report_id,
+    reportStatus: firstRow.report_status,
+    withdrawnAt: firstRow.withdrawn_at,
+  };
+}
+
+export async function withdrawVenueSubmission(
+  submissionId: string,
+): Promise<WithdrawnSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'withdraw_venue_submission' as never,
+    {
+      selected_submission_id: submissionId,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        submission_status: string;
+        withdrawn_at: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    submissionId: firstRow.submission_id,
+    submissionStatus: firstRow.submission_status,
+    withdrawnAt: firstRow.withdrawn_at,
+  };
+}
+
+export async function withdrawGameSubmission(
+  submissionId: string,
+): Promise<WithdrawnSubmissionResult | null> {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for Scout Mode.');
+  }
+
+  const { data, error } = await supabase.rpc(
+    'withdraw_game_submission' as never,
+    {
+      selected_submission_id: submissionId,
+    } as never,
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  const firstRow = (data?.[0] ?? null) as
+    | {
+        submission_id: string;
+        submission_status: string;
+        withdrawn_at: string;
+      }
+    | null;
+
+  if (!firstRow) {
+    return null;
+  }
+
+  return {
+    submissionId: firstRow.submission_id,
+    submissionStatus: firstRow.submission_status,
+    withdrawnAt: firstRow.withdrawn_at,
+  };
 }
 
 export async function approveVenueSubmission(
@@ -845,4 +1093,6 @@ export type {
   ScoutVenue,
   SubmittedGameSubmissionResult,
   SubmittedVenueSubmissionResult,
+  WithdrawnInventoryReportResult,
+  WithdrawnSubmissionResult,
 };

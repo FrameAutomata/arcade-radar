@@ -6,8 +6,8 @@ export type AvailabilityStatus =
   | 'temporarily_unavailable'
   | 'removed';
 
-export type InventoryReportStatus = 'pending' | 'approved' | 'rejected';
-export type SubmissionStatus = 'pending' | 'approved' | 'rejected';
+export type InventoryReportStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+export type SubmissionStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 export type UserRole = 'scout' | 'admin';
 
 export interface Database {
@@ -155,6 +155,7 @@ export interface Database {
           reviewed_at: string | null;
           reviewed_by: string | null;
           review_notes: string | null;
+          withdrawn_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -171,6 +172,7 @@ export interface Database {
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           review_notes?: string | null;
+          withdrawn_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -183,6 +185,7 @@ export interface Database {
           reviewed_at?: string | null;
           reviewed_by?: string | null;
           review_notes?: string | null;
+          withdrawn_at?: string | null;
         };
       };
       user_roles: {
@@ -222,6 +225,8 @@ export interface Database {
           reviewed_by: string | null;
           review_notes: string | null;
           approved_venue_id: string | null;
+          submission_fingerprint: string;
+          withdrawn_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -243,6 +248,8 @@ export interface Database {
           reviewed_by?: string | null;
           review_notes?: string | null;
           approved_venue_id?: string | null;
+          submission_fingerprint?: string;
+          withdrawn_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -252,6 +259,8 @@ export interface Database {
           reviewed_by?: string | null;
           review_notes?: string | null;
           approved_venue_id?: string | null;
+          submission_fingerprint?: string;
+          withdrawn_at?: string | null;
           updated_at?: string;
         };
       };
@@ -270,6 +279,8 @@ export interface Database {
           reviewed_by: string | null;
           review_notes: string | null;
           approved_game_id: string | null;
+          submission_fingerprint: string;
+          withdrawn_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -287,6 +298,8 @@ export interface Database {
           reviewed_by?: string | null;
           review_notes?: string | null;
           approved_game_id?: string | null;
+          submission_fingerprint?: string;
+          withdrawn_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -296,6 +309,8 @@ export interface Database {
           reviewed_by?: string | null;
           review_notes?: string | null;
           approved_game_id?: string | null;
+          submission_fingerprint?: string;
+          withdrawn_at?: string | null;
           updated_at?: string;
         };
       };
@@ -481,6 +496,61 @@ export interface Database {
           submitted_by: string;
         }[];
       };
+      list_my_pending_inventory_reports: {
+        Args: {
+          result_limit?: number;
+        };
+        Returns: {
+          report_id: string;
+          venue_game_id: string | null;
+          venue_id: string;
+          venue_name: string;
+          game_id: string;
+          game_title: string;
+          report_type: string;
+          quantity: number;
+          machine_label: string | null;
+          notes: string | null;
+          created_at: string;
+          submitted_by: string;
+        }[];
+      };
+      list_my_pending_game_submissions: {
+        Args: {
+          result_limit?: number;
+        };
+        Returns: {
+          submission_id: string;
+          submitted_by: string;
+          title: string;
+          manufacturer: string | null;
+          release_year: number | null;
+          aliases: string[];
+          categories: string[];
+          notes: string | null;
+          created_at: string;
+        }[];
+      };
+      list_my_pending_venue_submissions: {
+        Args: {
+          result_limit?: number;
+        };
+        Returns: {
+          submission_id: string;
+          submitted_by: string;
+          name: string;
+          street_address: string | null;
+          city: string;
+          region: string;
+          postal_code: string | null;
+          country: string;
+          latitude: number;
+          longitude: number;
+          website: string | null;
+          notes: string | null;
+          created_at: string;
+        }[];
+      };
       list_pending_game_submissions: {
         Args: {
           result_limit?: number;
@@ -611,6 +681,36 @@ export interface Database {
         Returns: {
           submission_id: string;
           submission_status: SubmissionStatus;
+        }[];
+      };
+      withdraw_game_submission: {
+        Args: {
+          selected_submission_id: string;
+        };
+        Returns: {
+          submission_id: string;
+          submission_status: SubmissionStatus;
+          withdrawn_at: string;
+        }[];
+      };
+      withdraw_inventory_report: {
+        Args: {
+          selected_report_id: string;
+        };
+        Returns: {
+          report_id: string;
+          report_status: InventoryReportStatus;
+          withdrawn_at: string;
+        }[];
+      };
+      withdraw_venue_submission: {
+        Args: {
+          selected_submission_id: string;
+        };
+        Returns: {
+          submission_id: string;
+          submission_status: SubmissionStatus;
+          withdrawn_at: string;
         }[];
       };
     };
