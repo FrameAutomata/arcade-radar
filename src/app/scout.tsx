@@ -16,17 +16,27 @@ import { theme } from '@/constants/theme';
 import { getAuthSessionSummary } from '@/lib/auth';
 import { resolveAppLocation } from '@/lib/geocoding';
 import {
+  approveGameSubmission,
   approveScoutInventoryReport,
+  approveVenueSubmission,
   createScoutGame,
   createScoutVenue,
   getScoutSessionUser,
   getScoutErrorMessage,
+  listPendingGameSubmissions,
   rejectScoutInventoryReport,
+  rejectGameSubmission,
+  rejectVenueSubmission,
   listPendingScoutReports,
+  listPendingVenueSubmissions,
   listScoutVenues,
   searchScoutGames,
+  submitScoutGameSubmission,
   submitScoutInventoryReport,
+  submitScoutVenueSubmission,
+  type PendingGameSubmission,
   type PendingInventoryReport,
+  type PendingVenueSubmission,
   type ScoutReportType,
   type ScoutVenue,
 } from '@/lib/scout';
@@ -235,9 +245,12 @@ export default function ScoutScreen() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [sessionRole, setSessionRole] = useState<UserRole | null>(null);
   const [pendingReports, setPendingReports] = useState<PendingInventoryReport[]>([]);
+  const [pendingVenueSubmissions, setPendingVenueSubmissions] = useState<PendingVenueSubmission[]>([]);
+  const [pendingGameSubmissions, setPendingGameSubmissions] = useState<PendingGameSubmission[]>([]);
   const [isLoadingQueue, setIsLoadingQueue] = useState(true);
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const [activeModerationReportId, setActiveModerationReportId] = useState<string | null>(null);
+  const [activeModerationSubmissionId, setActiveModerationSubmissionId] = useState<string | null>(null);
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueStreetAddress, setNewVenueStreetAddress] = useState('');
   const [newVenueCity, setNewVenueCity] = useState('');
@@ -309,10 +322,14 @@ export default function ScoutScreen() {
   }, [recentGames, selectedGame]);
   const parsedQuantity = Number(quantity);
   const canSubmitReport =
+    Boolean(sessionEmail) &&
     Boolean(selectedVenue && selectedGame) &&
     Number.isFinite(parsedQuantity) &&
     parsedQuantity >= 1 &&
     !isSubmitting;
+  const canContribute = Boolean(sessionEmail);
+  const reviewQueueCount =
+    pendingReports.length + pendingVenueSubmissions.length + pendingGameSubmissions.length;
   const duplicateSubmission = useMemo(() => {
     if (!selectedVenue || !selectedGame) {
       return null;
@@ -426,6 +443,8 @@ export default function ScoutScreen() {
         }
       }
 
+      let nextSessionRole: UserRole | null = null;
+
       try {
         const [user, authSummary] = await Promise.all([
           getScoutSessionUser(),
@@ -436,6 +455,8 @@ export default function ScoutScreen() {
           setSessionEmail(user?.email ?? null);
           setSessionRole(authSummary?.role ?? null);
         }
+
+        nextSessionRole = authSummary?.role ?? null;
       } catch {
         if (!cancelled) {
           setSessionEmail(null);
@@ -443,23 +464,37 @@ export default function ScoutScreen() {
         }
       }
 
-      try {
-        const nextPendingReports = await listPendingScoutReports();
+      if (nextSessionRole === 'admin') {
+        try {
+          const [
+            nextPendingReports,
+            nextPendingVenueSubmissions,
+            nextPendingGameSubmissions,
+          ] = await Promise.all([
+            listPendingScoutReports(),
+            listPendingVenueSubmissions(),
+            listPendingGameSubmissions(),
+          ]);
 
-        if (!cancelled) {
-          setPendingReports(nextPendingReports);
+          if (!cancelled) {
+            setPendingReports(nextPendingReports);
+            setPendingVenueSubmissions(nextPendingVenueSubmissions);
+            setPendingGameSubmissions(nextPendingGameSubmissions);
+          }
+        } catch {
+          if (!cancelled) {
+            setLoadError((currentMessage) =>
+              currentMessage ??
+              'Scout Mode loaded, but the review queue is unavailable until you sign in with an admin account.',
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setIsLoadingQueue(false);
+          }
         }
-      } catch {
-        if (!cancelled) {
-          setLoadError((currentMessage) =>
-            currentMessage ??
-            'Scout Mode loaded, but the review queue is unavailable until you sign in with a scout/admin account.',
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingQueue(false);
-        }
+      } else if (!cancelled) {
+        setIsLoadingQueue(false);
       }
     }
 
@@ -502,13 +537,27 @@ export default function ScoutScreen() {
   }, [gameQuery]);
 
   async function refreshPendingReports() {
+    if (sessionRole !== 'admin') {
+      return;
+    }
+
     setIsLoadingQueue(true);
 
     try {
-      const nextPendingReports = await listPendingScoutReports();
+      const [
+        nextPendingReports,
+        nextPendingVenueSubmissions,
+        nextPendingGameSubmissions,
+      ] = await Promise.all([
+        listPendingScoutReports(),
+        listPendingVenueSubmissions(),
+        listPendingGameSubmissions(),
+      ]);
       setPendingReports(nextPendingReports);
+      setPendingVenueSubmissions(nextPendingVenueSubmissions);
+      setPendingGameSubmissions(nextPendingGameSubmissions);
     } catch {
-      setLoadError('Could not refresh the pending Scout report queue.');
+      setQueueMessage('Could not refresh the pending review queue.');
     } finally {
       setIsLoadingQueue(false);
     }
@@ -669,7 +718,80 @@ export default function ScoutScreen() {
     }
   }
 
+  async function approveVenueReviewItem(submissionId: string) {
+    setActiveModerationSubmissionId(submissionId);
+    setQueueMessage(null);
+
+    try {
+      const result = await approveVenueSubmission(submissionId);
+      await Promise.all([refreshPendingReports(), refreshScoutVenues()]);
+      setQueueMessage(
+        result
+          ? `Venue approved: ${result.createdVenueName}.`
+          : 'Venue submission approved.',
+      );
+    } catch {
+      setQueueMessage('Venue approval failed. Confirm you are signed in as admin.');
+    } finally {
+      setActiveModerationSubmissionId(null);
+    }
+  }
+
+  async function rejectVenueReviewItem(submissionId: string) {
+    setActiveModerationSubmissionId(submissionId);
+    setQueueMessage(null);
+
+    try {
+      await rejectVenueSubmission(submissionId);
+      await refreshPendingReports();
+      setQueueMessage('Venue submission rejected.');
+    } catch {
+      setQueueMessage('Venue rejection failed. Confirm you are signed in as admin.');
+    } finally {
+      setActiveModerationSubmissionId(null);
+    }
+  }
+
+  async function approveGameReviewItem(submissionId: string) {
+    setActiveModerationSubmissionId(submissionId);
+    setQueueMessage(null);
+
+    try {
+      const result = await approveGameSubmission(submissionId);
+      await refreshPendingReports();
+      setQueueMessage(
+        result
+          ? `Game approved: ${result.createdGameTitle}.`
+          : 'Game submission approved.',
+      );
+    } catch {
+      setQueueMessage('Game approval failed. Confirm you are signed in as admin.');
+    } finally {
+      setActiveModerationSubmissionId(null);
+    }
+  }
+
+  async function rejectGameReviewItem(submissionId: string) {
+    setActiveModerationSubmissionId(submissionId);
+    setQueueMessage(null);
+
+    try {
+      await rejectGameSubmission(submissionId);
+      await refreshPendingReports();
+      setQueueMessage('Game submission rejected.');
+    } catch {
+      setQueueMessage('Game rejection failed. Confirm you are signed in as admin.');
+    } finally {
+      setActiveModerationSubmissionId(null);
+    }
+  }
+
   async function submitReport() {
+    if (!sessionEmail) {
+      setSubmitMessage('Sign in or create an account before submitting a report.');
+      return;
+    }
+
     if (!selectedVenue || !selectedGame) {
       setSubmitMessage('Pick a venue and a game before submitting a scout report.');
       return;
@@ -718,10 +840,13 @@ export default function ScoutScreen() {
         `Submitted ${submittedGameTitle}. ${submittedVenueName} is still selected for the next cabinet.`,
       );
       resetReportDetails();
-      await refreshPendingReports();
+
+      if (sessionRole === 'admin') {
+        await refreshPendingReports();
+      }
     } catch {
       setSubmitMessage(
-        'Report submission failed. Make sure you are signed in with a scout/admin account.',
+        'Report submission failed. Make sure you are signed in and try again.',
       );
     } finally {
       setIsSubmitting(false);
@@ -729,6 +854,11 @@ export default function ScoutScreen() {
   }
 
   async function createVenueFromForm() {
+    if (!sessionEmail) {
+      setNewVenueMessage('Sign in or create an account before submitting a venue.');
+      return;
+    }
+
     if (!newVenueName.trim() || !newVenueStreetAddress.trim() || !newVenueCity.trim() || !newVenueRegion.trim()) {
       setNewVenueMessage('Enter the venue name, street address, city, and region before saving.');
       return;
@@ -751,6 +881,36 @@ export default function ScoutScreen() {
 
       if (!resolvedLocation) {
         setNewVenueMessage('Could not geocode that address yet. Double-check the address and try again.');
+        return;
+      }
+
+      if (sessionRole !== 'admin') {
+        const submittedVenue = await submitScoutVenueSubmission({
+          name: newVenueName,
+          streetAddress: newVenueStreetAddress,
+          city: newVenueCity,
+          country: 'US',
+          latitude: resolvedLocation.coordinates.latitude,
+          longitude: resolvedLocation.coordinates.longitude,
+          notes: newVenueNotes,
+          postalCode: newVenuePostalCode,
+          region: newVenueRegion,
+          website: newVenueWebsite,
+        });
+
+        if (!submittedVenue) {
+          setNewVenueMessage('Venue submission did not return a review item. Try again.');
+          return;
+        }
+
+        setNewVenueName('');
+        setNewVenueStreetAddress('');
+        setNewVenueCity('');
+        setNewVenueRegion('TX');
+        setNewVenuePostalCode('');
+        setNewVenueWebsite('');
+        setNewVenueNotes('');
+        setNewVenueMessage('Venue submitted for admin review. It will appear in search after approval.');
         return;
       }
 
@@ -802,6 +962,11 @@ export default function ScoutScreen() {
   }
 
   async function createGameFromForm() {
+    if (!sessionEmail) {
+      setNewGameMessage('Sign in or create an account before submitting a game.');
+      return;
+    }
+
     if (!newGameTitle.trim()) {
       setNewGameMessage('Enter the game title before saving.');
       return;
@@ -823,15 +988,41 @@ export default function ScoutScreen() {
     setNewGameMessage(null);
 
     try {
+      const nextAliases = newGameAliases
+        .split('|')
+        .map((alias) => alias.trim())
+        .filter(Boolean);
+      const nextCategories = newGameCategories
+        .split('|')
+        .map((category) => category.trim())
+        .filter(Boolean);
+
+      if (sessionRole !== 'admin') {
+        const submittedGame = await submitScoutGameSubmission({
+          aliases: nextAliases,
+          categories: nextCategories,
+          manufacturer: newGameManufacturer,
+          releaseYear: parsedReleaseYear,
+          title: newGameTitle,
+        });
+
+        if (!submittedGame) {
+          setNewGameMessage('Game submission did not return a review item. Try again.');
+          return;
+        }
+
+        setNewGameTitle('');
+        setNewGameManufacturer('');
+        setNewGameReleaseYear('');
+        setNewGameAliases('');
+        setNewGameCategories('');
+        setNewGameMessage('Game submitted for admin review. It will appear in search after approval.');
+        return;
+      }
+
       const createdGame = await createScoutGame({
-        aliases: newGameAliases
-          .split('|')
-          .map((alias) => alias.trim())
-          .filter(Boolean),
-        categories: newGameCategories
-          .split('|')
-          .map((category) => category.trim())
-          .filter(Boolean),
+        aliases: nextAliases,
+        categories: nextCategories,
         manufacturer: newGameManufacturer,
         releaseYear: parsedReleaseYear,
         title: newGameTitle,
@@ -892,12 +1083,14 @@ export default function ScoutScreen() {
               <Text style={styles.heroStatLabel}>current scout session</Text>
             </View>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{sessionRole ?? 'viewer'}</Text>
+              <Text style={styles.heroStatValue}>
+                {sessionEmail ? sessionRole ?? 'contributor' : 'guest'}
+              </Text>
               <Text style={styles.heroStatLabel}>current access role</Text>
             </View>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatValue}>{pendingReports.length}</Text>
-              <Text style={styles.heroStatLabel}>pending reports</Text>
+              <Text style={styles.heroStatValue}>{reviewQueueCount}</Text>
+              <Text style={styles.heroStatLabel}>pending review items</Text>
             </View>
           </View>
         </View>
@@ -1005,7 +1198,7 @@ export default function ScoutScreen() {
                 ))}
               </View>
             ) : null}
-            {(sessionRole === 'admin' || sessionRole === 'scout') && !selectedVenue && !isAddingVenue ? (
+            {canContribute && !selectedVenue && !isAddingVenue ? (
               <Pressable
                 onPress={() => setIsAddingVenue(true)}
                 style={styles.secondaryButton}
@@ -1013,7 +1206,7 @@ export default function ScoutScreen() {
                 <Text style={styles.secondaryButtonText}>Add missing venue</Text>
               </Pressable>
             ) : null}
-            {(sessionRole === 'admin' || sessionRole === 'scout') && !selectedVenue && isAddingVenue ? (
+            {canContribute && !selectedVenue && isAddingVenue ? (
               <View style={styles.subPanel}>
                 <View style={styles.subPanelHeader}>
                   <Text style={styles.subPanelTitle}>Add a new venue</Text>
@@ -1022,7 +1215,7 @@ export default function ScoutScreen() {
                   </Pressable>
                 </View>
                 <Text style={styles.helperText}>
-                  If the arcade is missing, save it here and Scout Mode will geocode the address and add it to the active venue list.
+                  If the arcade is missing, submit it here. Admin approval adds it to the live venue list.
                 </Text>
                 <TextInput
                   onChangeText={setNewVenueName}
@@ -1089,7 +1282,13 @@ export default function ScoutScreen() {
                   style={[styles.secondaryButton, isCreatingVenue && styles.primaryButtonMuted]}
                 >
                   <Text style={styles.secondaryButtonText}>
-                    {isCreatingVenue ? 'Saving venue...' : 'Save new venue'}
+                    {isCreatingVenue
+                      ? sessionRole === 'admin'
+                        ? 'Saving venue...'
+                        : 'Submitting venue...'
+                      : sessionRole === 'admin'
+                      ? 'Save new venue'
+                      : 'Submit venue for review'}
                   </Text>
                 </Pressable>
               </View>
@@ -1154,7 +1353,7 @@ export default function ScoutScreen() {
                 ))}
               </View>
             ) : null}
-            {sessionRole === 'admin' && !selectedGame && !isAddingGame ? (
+            {canContribute && !selectedGame && !isAddingGame ? (
               <Pressable
                 onPress={() => setIsAddingGame(true)}
                 style={styles.secondaryButton}
@@ -1162,7 +1361,7 @@ export default function ScoutScreen() {
                 <Text style={styles.secondaryButtonText}>Add missing game</Text>
               </Pressable>
             ) : null}
-            {sessionRole === 'admin' && !selectedGame && isAddingGame ? (
+            {canContribute && !selectedGame && isAddingGame ? (
               <View style={styles.subPanel}>
                 <View style={styles.subPanelHeader}>
                   <Text style={styles.subPanelTitle}>Add a new game</Text>
@@ -1171,7 +1370,7 @@ export default function ScoutScreen() {
                   </Pressable>
                 </View>
                 <Text style={styles.helperText}>
-                  Use this when a real cabinet is missing from the catalog. Aliases and categories should be pipe-separated, like `mvc2|marvel 2` or `Fighting|Classic`.
+                  Use this when a real cabinet is missing from the catalog. Admin approval adds it to live search.
                 </Text>
                 <TextInput
                   onChangeText={setNewGameTitle}
@@ -1220,7 +1419,13 @@ export default function ScoutScreen() {
                   style={[styles.secondaryButton, isCreatingGame && styles.primaryButtonMuted]}
                 >
                   <Text style={styles.secondaryButtonText}>
-                    {isCreatingGame ? 'Saving game...' : 'Save new game'}
+                    {isCreatingGame
+                      ? sessionRole === 'admin'
+                        ? 'Saving game...'
+                        : 'Submitting game...'
+                      : sessionRole === 'admin'
+                      ? 'Save new game'
+                      : 'Submit game for review'}
                   </Text>
                 </Pressable>
               </View>
@@ -1305,6 +1510,8 @@ export default function ScoutScreen() {
                   ? 'Submitting...'
                   : canSubmitReport
                   ? 'Submit scout report'
+                  : !sessionEmail
+                  ? 'Sign in to submit'
                   : 'Pick venue and game to submit'}
               </Text>
             </Pressable>
@@ -1316,7 +1523,7 @@ export default function ScoutScreen() {
                 <View>
                   <Text style={styles.sectionTitle}>Review queue</Text>
                   <Text style={styles.queueHeaderMeta}>
-                    {pendingReports.length} pending report{pendingReports.length === 1 ? '' : 's'}
+                    {reviewQueueCount} pending item{reviewQueueCount === 1 ? '' : 's'}
                   </Text>
                 </View>
                 <Pressable onPress={() => void refreshPendingReports()} style={styles.secondaryButton}>
@@ -1326,9 +1533,127 @@ export default function ScoutScreen() {
               {queueMessage ? <Text style={styles.helperMessage}>{queueMessage}</Text> : null}
 
               {isLoadingQueue ? (
-                <Text style={styles.emptyText}>Loading pending reports...</Text>
-              ) : groupedPendingReports.length > 0 ? (
+                <Text style={styles.emptyText}>Loading pending review items...</Text>
+              ) : reviewQueueCount > 0 ? (
                 <View style={styles.cardList}>
+                  {pendingVenueSubmissions.length > 0 ? (
+                    <View style={styles.queueVenueGroup}>
+                      <View style={styles.queueVenueHeader}>
+                        <Text style={styles.queueVenueTitle}>Venue submissions</Text>
+                        <Text style={styles.queueVenueCount}>
+                          {pendingVenueSubmissions.length} pending
+                        </Text>
+                      </View>
+                      <View style={styles.cardList}>
+                        {pendingVenueSubmissions.map((submission) => (
+                          <View key={submission.submissionId} style={styles.queueCard}>
+                            <Text style={styles.queueTitle}>{submission.name}</Text>
+                            <Text style={styles.queueMeta}>
+                              {submission.streetAddress ? `${submission.streetAddress}, ` : ''}
+                              {submission.city}, {submission.region}
+                              {submission.postalCode ? ` ${submission.postalCode}` : ''}
+                            </Text>
+                            {submission.website ? (
+                              <Text style={styles.queueMeta}>{submission.website}</Text>
+                            ) : null}
+                            {submission.notes ? (
+                              <Text style={styles.queueNote}>{submission.notes}</Text>
+                            ) : null}
+                            <Text style={styles.queueMeta}>Submitted by {submission.submittedBy}</Text>
+                            <View style={styles.queueActions}>
+                              <Pressable
+                                disabled={activeModerationSubmissionId === submission.submissionId}
+                                onPress={() => void approveVenueReviewItem(submission.submissionId)}
+                                style={[
+                                  styles.queueActionButton,
+                                  styles.queueApproveButton,
+                                  activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
+                                ]}
+                              >
+                                <Text style={styles.queueApproveButtonText}>
+                                  {activeModerationSubmissionId === submission.submissionId ? 'Working...' : 'Approve'}
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                disabled={activeModerationSubmissionId === submission.submissionId}
+                                onPress={() => void rejectVenueReviewItem(submission.submissionId)}
+                                style={[
+                                  styles.queueActionButton,
+                                  styles.queueRejectButton,
+                                  activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
+                                ]}
+                              >
+                                <Text style={styles.queueRejectButtonText}>Reject</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {pendingGameSubmissions.length > 0 ? (
+                    <View style={styles.queueVenueGroup}>
+                      <View style={styles.queueVenueHeader}>
+                        <Text style={styles.queueVenueTitle}>Game submissions</Text>
+                        <Text style={styles.queueVenueCount}>
+                          {pendingGameSubmissions.length} pending
+                        </Text>
+                      </View>
+                      <View style={styles.cardList}>
+                        {pendingGameSubmissions.map((submission) => (
+                          <View key={submission.submissionId} style={styles.queueCard}>
+                            <Text style={styles.queueTitle}>{submission.title}</Text>
+                            <Text style={styles.queueMeta}>
+                              {submission.manufacturer ?? 'Unknown manufacturer'}
+                              {submission.releaseYear ? ` • ${submission.releaseYear}` : ''}
+                            </Text>
+                            {submission.categories.length > 0 ? (
+                              <Text style={styles.queueNote}>
+                                Categories: {submission.categories.join(', ')}
+                              </Text>
+                            ) : null}
+                            {submission.aliases.length > 0 ? (
+                              <Text style={styles.queueNote}>
+                                Aliases: {submission.aliases.join(', ')}
+                              </Text>
+                            ) : null}
+                            {submission.notes ? (
+                              <Text style={styles.queueNote}>{submission.notes}</Text>
+                            ) : null}
+                            <Text style={styles.queueMeta}>Submitted by {submission.submittedBy}</Text>
+                            <View style={styles.queueActions}>
+                              <Pressable
+                                disabled={activeModerationSubmissionId === submission.submissionId}
+                                onPress={() => void approveGameReviewItem(submission.submissionId)}
+                                style={[
+                                  styles.queueActionButton,
+                                  styles.queueApproveButton,
+                                  activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
+                                ]}
+                              >
+                                <Text style={styles.queueApproveButtonText}>
+                                  {activeModerationSubmissionId === submission.submissionId ? 'Working...' : 'Approve'}
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                disabled={activeModerationSubmissionId === submission.submissionId}
+                                onPress={() => void rejectGameReviewItem(submission.submissionId)}
+                                style={[
+                                  styles.queueActionButton,
+                                  styles.queueRejectButton,
+                                  activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
+                                ]}
+                              >
+                                <Text style={styles.queueRejectButtonText}>Reject</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+
                   {groupedPendingReports.map((group) => (
                     <View key={group.venueId} style={styles.queueVenueGroup}>
                       <View style={styles.queueVenueHeader}>

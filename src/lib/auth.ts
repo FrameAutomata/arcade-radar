@@ -1,4 +1,4 @@
-import { hasSupabaseCredentials } from '@/lib/env';
+import { env, hasSupabaseCredentials } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 import type { Database, UserRole } from '@/types/database';
 
@@ -54,6 +54,26 @@ export async function signInWithPassword(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: email.trim(),
     password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function signUpWithPassword(email: string, password: string) {
+  if (!hasSupabaseCredentials || !supabase) {
+    throw new Error('Supabase is not configured for authentication.');
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+    options: {
+      emailRedirectTo: env.authRedirectUrl,
+    },
   });
 
   if (error) {

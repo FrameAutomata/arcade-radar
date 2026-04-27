@@ -49,8 +49,14 @@ const config: ExpoConfig = {
     ],
   ],
   extra: {
+    eas: {
+      projectId: 'd6de6c1c-452f-4c84-b254-3f84de5094cc',
+    },
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
     supabaseKey: process.env.EXPO_PUBLIC_SUPABASE_KEY ?? '',
+    authRedirectUrl:
+      process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL ??
+      'https://arcade-radar--demo.expo.app/',
   },
 };
 
