@@ -23,6 +23,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="demo" options={{ title: "Demo" }} />
         <Stack.Screen name="auth" options={{ title: "Account" }} />
         <Stack.Screen name="scout" options={{ title: "Scout mode" }} />
         <Stack.Screen name="venue/[id]" options={{ title: "Venue details" }} />

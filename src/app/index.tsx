@@ -342,6 +342,11 @@ export default function HomeScreen() {
         scrollEnabled={Platform.OS === "web" ? true : !isMapInteracting}
       >
         <View style={styles.topActions}>
+          <Link href="./demo" asChild>
+            <Pressable style={scoutLinkStyle}>
+              <Text style={styles.navButtonText}>Demo</Text>
+            </Pressable>
+          </Link>
           <Link href="./scout" asChild>
             <Pressable style={scoutLinkStyle}>
               <Text style={styles.navButtonText}>Scout</Text>
