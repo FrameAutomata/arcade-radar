@@ -30,6 +30,24 @@ const talkingPoints = [
   "The map stack avoids Google Maps Platform costs.",
 ];
 
+const featuredDemoSearches = [
+  {
+    game: "Street Fighter III: 3rd Strike",
+    location: "75201",
+    title: "Fighting game run",
+  },
+  {
+    game: "Marvel vs. Capcom 2",
+    location: "75080",
+    title: "Rare cabinet search",
+  },
+  {
+    game: "DanceDanceRevolution",
+    location: "76051",
+    title: "Rhythm game search",
+  },
+];
+
 export default function DemoScreen() {
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 1100;
@@ -61,6 +79,35 @@ export default function DemoScreen() {
                 <Text style={styles.secondaryButtonText}>Scout flow</Text>
               </Pressable>
             </Link>
+          </View>
+        </View>
+
+        <View style={styles.panel}>
+          <Text style={styles.sectionTitle}>Featured demo searches</Text>
+          <Text style={styles.helperText}>
+            Use these one-tap paths while presenting. They prefill location and
+            game search so you can get to the map quickly.
+          </Text>
+          <View style={styles.demoSearchGrid}>
+            {featuredDemoSearches.map((search) => (
+              <Link
+                key={search.title}
+                href={{
+                  pathname: "/",
+                  params: {
+                    game: search.game,
+                    location: search.location,
+                  },
+                }}
+                asChild
+              >
+                <Pressable style={styles.demoSearchCard}>
+                  <Text style={styles.demoSearchTitle}>{search.title}</Text>
+                  <Text style={styles.demoSearchMeta}>{search.game}</Text>
+                  <Text style={styles.demoSearchMeta}>Near {search.location}</Text>
+                </Pressable>
+              </Link>
+            ))}
           </View>
         </View>
 
@@ -315,5 +362,25 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  demoSearchGrid: {
+    gap: theme.spacing.sm,
+  },
+  demoSearchCard: {
+    backgroundColor: theme.colors.surfaceMuted,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    gap: 4,
+    padding: theme.spacing.md,
+  },
+  demoSearchTitle: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  demoSearchMeta: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
   },
 });

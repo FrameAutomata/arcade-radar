@@ -1,5 +1,5 @@
 import * as Location from "expo-location";
-import { Link, useFocusEffect } from "expo-router";
+import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   useCallback,
   useDeferredValue,
@@ -44,6 +44,10 @@ const DISTANCE_FILTERS_MILES = [10, 25, 50, 100, 250] as const;
 const DEFAULT_DISTANCE_FILTER_MILES = 50;
 
 export default function HomeScreen() {
+  const params = useLocalSearchParams<{
+    game?: string;
+    location?: string;
+  }>();
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 1100;
   const [isMapInteracting, setIsMapInteracting] = useState(false);
@@ -67,6 +71,7 @@ export default function HomeScreen() {
   const [resultsError, setResultsError] = useState<string | null>(null);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
   const [authSession, setAuthSession] = useState<AuthSessionSummary | null>(null);
+  const [appliedDemoParams, setAppliedDemoParams] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(searchQuery);
 
   const game = selectedGame;
@@ -209,6 +214,66 @@ export default function HomeScreen() {
       cancelled = true;
     };
   }, [distanceFilterMiles, game, userLocation]);
+
+  useEffect(() => {
+    const paramLocation = typeof params.location === "string" ? params.location.trim() : "";
+    const paramGame = typeof params.game === "string" ? params.game.trim() : "";
+    const paramKey = `${paramLocation}|${paramGame}`;
+
+    if ((!paramLocation && !paramGame) || appliedDemoParams === paramKey) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function applyDemoParams() {
+      setAppliedDemoParams(paramKey);
+
+      if (paramLocation) {
+        setManualLocationQuery(paramLocation);
+        setLocationError(null);
+        setIsApplyingManualLocation(true);
+
+        try {
+          const manualLocation = await resolveAppLocation(paramLocation);
+
+          if (!cancelled && manualLocation) {
+            setUserLocation(manualLocation.coordinates);
+            setLocationLabel(manualLocation.label);
+          }
+        } finally {
+          if (!cancelled) {
+            setIsApplyingManualLocation(false);
+          }
+        }
+      }
+
+      if (paramGame) {
+        startTransition(() => {
+          setSearchQuery(paramGame);
+          setSelectedGame(null);
+        });
+
+        try {
+          const [matchedGame] = await searchGamesLive(paramGame, 1);
+
+          if (!cancelled && matchedGame) {
+            selectGame(matchedGame);
+          }
+        } catch {
+          if (!cancelled) {
+            setResultsError("Demo game search is not available right now.");
+          }
+        }
+      }
+    }
+
+    void applyDemoParams();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedDemoParams, params.game, params.location]);
 
   const pins = [
     {
