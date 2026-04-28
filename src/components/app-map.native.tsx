@@ -136,30 +136,41 @@ export function AppMap({
           />
         </RasterSource>
 
-        {pins.map((pin) => (
-          <Marker
-            key={pin.id}
-            anchor="bottom"
-            lngLat={[pin.coordinate.longitude, pin.coordinate.latitude]}
-            onPress={() => onPinPress?.(pin.id)}
-          >
-            <View style={styles.markerWrap}>
-              <View
-                style={[
-                  styles.dot,
-                  pin.isUserLocation ? styles.userDot : styles.venueDot,
-                  selectedPinId === pin.id && styles.dotSelected,
-                ]}
-              />
-              <View style={styles.label}>
-                <Text style={styles.labelTitle}>{pin.title}</Text>
-                {pin.description ? (
-                  <Text style={styles.labelText}>{pin.description}</Text>
+        {pins.map((pin) => {
+          const isSelected = selectedPinId === pin.id;
+
+          return (
+            <Marker
+              key={pin.id}
+              anchor="bottom"
+              lngLat={[pin.coordinate.longitude, pin.coordinate.latitude]}
+              onPress={() => onPinPress?.(pin.id)}
+            >
+              <View style={styles.markerWrap}>
+                <View
+                  style={[
+                    styles.dot,
+                    pin.isUserLocation ? styles.userDot : styles.venueDot,
+                    isSelected && styles.dotSelected,
+                  ]}
+                />
+                {isSelected ? (
+                  <View style={styles.label}>
+                    <Text style={styles.labelTitle}>{pin.title}</Text>
+                    {pin.description ? (
+                      <Text style={styles.labelText}>{pin.description}</Text>
+                    ) : null}
+                    {!pin.isUserLocation ? (
+                      <Text style={styles.labelAction}>
+                        Tap again for directions
+                      </Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
-            </View>
-          </Marker>
-        ))}
+            </Marker>
+          );
+        })}
       </Map>
 
       <View style={styles.zoomControls}>
@@ -255,5 +266,12 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 11,
     lineHeight: 16,
+  },
+  labelAction: {
+    color: theme.colors.brandMuted,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 16,
+    marginTop: 4,
   },
 });
