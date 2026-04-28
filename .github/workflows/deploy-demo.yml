@@ -8,6 +8,25 @@ on:
         required: true
         default: demo
         type: string
+      build_android:
+        description: Start an Android EAS build after deploying the web demo
+        required: true
+        default: true
+        type: boolean
+      android_profile:
+        description: EAS Android build profile
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - development
+          - production
+      wait_for_android_build:
+        description: Wait for Android build completion instead of only starting it
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   deploy-demo:
@@ -42,6 +61,26 @@ jobs:
 
       - name: Deploy alias
         run: npx eas-cli@latest deploy --alias "${{ inputs.alias }}" --non-interactive
+        env:
+          EAS_NO_VCS: 1
+          EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--${{ inputs.alias }}.expo.app/
+          EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Start Android build
+        if: ${{ inputs.build_android && !inputs.wait_for_android_build }}
+        run: npx eas-cli@latest build --platform android --profile "${{ inputs.android_profile }}" --non-interactive --no-wait
+        env:
+          EAS_NO_VCS: 1
+          EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--${{ inputs.alias }}.expo.app/
+          EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build Android
+        if: ${{ inputs.build_android && inputs.wait_for_android_build }}
+        run: npx eas-cli@latest build --platform android --profile "${{ inputs.android_profile }}" --non-interactive
         env:
           EAS_NO_VCS: 1
           EXPO_PUBLIC_AUTH_REDIRECT_URL: https://arcade-radar--${{ inputs.alias }}.expo.app/
