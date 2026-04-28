@@ -70,6 +70,32 @@ Web export smoke test:
 npm run build:web
 ```
 
+Optional Supabase integration tests:
+
+```bash
+npm run test:integration
+```
+
+These tests are skipped unless test-specific Supabase env vars are present. They
+exercise live RPC contracts and, when a test user is configured, submit a pending
+inventory report, verify duplicate blocking, then withdraw the report.
+
+Required local env vars for live integration tests:
+
+- `SUPABASE_TEST_URL`
+- `SUPABASE_TEST_KEY`
+
+Required for writable contribution-flow tests:
+
+- `SUPABASE_TEST_USER_EMAIL`
+- `SUPABASE_TEST_USER_PASSWORD`
+
+Optional:
+
+- `SUPABASE_TEST_GAME_QUERY`
+- `SUPABASE_TEST_LATITUDE`
+- `SUPABASE_TEST_LONGITUDE`
+
 Current test coverage starts with pure unit tests for formatting, distance/map
 region calculations, and search helpers. The web export step acts as a lightweight
 integration smoke test for Expo Router and the web bundle.
@@ -81,12 +107,17 @@ GitHub Actions workflows live in `.github/workflows`.
 - `CI`: runs on pull requests and pushes to `main`.
 - `Deploy Demo`: manual workflow that typechecks, tests, then deploys the EAS
   Hosting `demo` alias.
+- `Supabase Integration Tests`: manual workflow for live backend contract tests.
 
 Required GitHub repository secrets:
 
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_SUPABASE_KEY`
 - `EXPO_TOKEN` for the manual EAS demo deploy workflow
+- `SUPABASE_TEST_URL`
+- `SUPABASE_TEST_KEY`
+- `SUPABASE_TEST_USER_EMAIL`
+- `SUPABASE_TEST_USER_PASSWORD`
 
 The workflows use `npm ci`, so keep `package-lock.json` committed whenever
 dependencies change.
