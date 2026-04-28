@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -287,6 +287,7 @@ export default function ScoutScreen() {
   const [hasLoadedRecentPicks, setHasLoadedRecentPicks] = useState(false);
   const [appliedRouteGameId, setAppliedRouteGameId] = useState<string | null>(null);
   const [appliedRouteVenueId, setAppliedRouteVenueId] = useState<string | null>(null);
+  const gameSearchInputRef = useRef<TextInput>(null);
 
   const filteredVenues = useMemo(() => {
     const normalizedQuery = venueQuery.trim().toLowerCase();
@@ -728,9 +729,18 @@ export default function ScoutScreen() {
   function resetReportDetails() {
     setSelectedGame(null);
     setGameQuery('');
+    setSelectedReportType('confirmed_present');
     setQuantity('1');
     setMachineLabel('');
     setNotes('');
+  }
+
+  function prepareNextCabinetReport() {
+    resetReportDetails();
+
+    setTimeout(() => {
+      gameSearchInputRef.current?.focus();
+    }, 50);
   }
 
   function addQuickNote(note: string) {
@@ -951,9 +961,9 @@ export default function ScoutScreen() {
         ...currentSubmissions,
       ].slice(0, 20));
       setSubmitMessage(
-        `Submitted ${submittedGameTitle}. ${submittedVenueName} is still selected for the next cabinet.`,
+        `Added ${submittedGameTitle}. Pick the next game at ${submittedVenueName}.`,
       );
-      resetReportDetails();
+      prepareNextCabinetReport();
       await refreshMyPendingItems();
 
       if (sessionRole === 'admin') {
@@ -1542,6 +1552,7 @@ export default function ScoutScreen() {
 
             <Text style={styles.sectionTitle}>2. Pick a game</Text>
             <TextInput
+              ref={gameSearchInputRef}
               onChangeText={(value) => {
                 setGameQuery(value);
                 setSelectedGame(null);
