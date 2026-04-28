@@ -342,14 +342,18 @@ export default function HomeScreen() {
 
   function handlePinPress(pinId: string) {
     if (pinId === "user-location") {
+      setSelectedVenueId(null);
       return;
     }
-
-    setSelectedVenueId(pinId);
 
     const tappedResult = results.find((result) => result.venue.id === pinId);
 
     if (!tappedResult) {
+      return;
+    }
+
+    if (selectedVenueId !== pinId) {
+      setSelectedVenueId(pinId);
       return;
     }
 
