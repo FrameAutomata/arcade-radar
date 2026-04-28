@@ -1,7 +1,8 @@
 export type InventoryStatus =
   | 'confirmed_present'
   | 'rumored_present'
-  | 'temporarily_unavailable';
+  | 'temporarily_unavailable'
+  | 'removed';
 
 export interface Game {
   id: string;

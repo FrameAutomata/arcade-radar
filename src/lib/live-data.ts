@@ -43,7 +43,7 @@ function assertSupabase() {
   return supabase;
 }
 
-function mapGame(row: SearchGameRow): Game {
+export function mapGame(row: SearchGameRow): Game {
   return {
     id: row.game_id,
     slug: row.slug,
@@ -55,7 +55,7 @@ function mapGame(row: SearchGameRow): Game {
   };
 }
 
-function mapGameTableRow(row: GameTableRow): Game {
+export function mapGameTableRow(row: GameTableRow): Game {
   return {
     aliases: row.aliases ?? [],
     categories: row.categories ?? [],
@@ -67,7 +67,7 @@ function mapGameTableRow(row: GameTableRow): Game {
   };
 }
 
-function buildPlaceholderInventory(count: number): VenueInventoryItem[] {
+export function buildPlaceholderInventory(count: number): VenueInventoryItem[] {
   return Array.from({ length: count }, (_, index) => ({
     gameId: `tracked-${index + 1}`,
     lastVerifiedAt: new Date().toISOString(),
@@ -76,18 +76,19 @@ function buildPlaceholderInventory(count: number): VenueInventoryItem[] {
   }));
 }
 
-function toInventoryStatus(status: string | null | undefined): InventoryStatus {
+export function toInventoryStatus(status: string | null | undefined): InventoryStatus {
   switch (status) {
     case 'confirmed_present':
     case 'rumored_present':
     case 'temporarily_unavailable':
+    case 'removed':
       return status;
     default:
       return 'rumored_present';
   }
 }
 
-function mapNearbyVenue(row: NearbyVenueRow, userLocation: Coordinates): NearbyVenueResult {
+export function mapNearbyVenue(row: NearbyVenueRow, userLocation: Coordinates): NearbyVenueResult {
   return {
     distanceMiles: distanceInMiles(userLocation, {
       latitude: row.latitude,
@@ -109,7 +110,7 @@ function mapNearbyVenue(row: NearbyVenueRow, userLocation: Coordinates): NearbyV
   };
 }
 
-function mapVenueMatch(row: VenueMatchRow, game: Game, userLocation: Coordinates): VenueMatch {
+export function mapVenueMatch(row: VenueMatchRow, game: Game, userLocation: Coordinates): VenueMatch {
   const inventory: VenueInventoryItem = {
     gameId: game.id,
     lastVerifiedAt:
@@ -140,7 +141,7 @@ function mapVenueMatch(row: VenueMatchRow, game: Game, userLocation: Coordinates
   };
 }
 
-function buildVenueDetailsModel(rows: VenueDetailRow[]): VenueDetailsModel | null {
+export function buildVenueDetailsModel(rows: VenueDetailRow[]): VenueDetailsModel | null {
   const firstRow = rows[0];
 
   if (!firstRow) {

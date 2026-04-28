@@ -1,0 +1,36 @@
+name: Supabase Integration Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    name: Run Supabase integration tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Supabase integration tests
+        run: npm run test:integration
+        env:
+          SUPABASE_TEST_GAME_QUERY: ${{ vars.SUPABASE_TEST_GAME_QUERY || 'Street' }}
+          SUPABASE_TEST_KEY: ${{ secrets.SUPABASE_TEST_KEY }}
+          SUPABASE_TEST_LATITUDE: ${{ vars.SUPABASE_TEST_LATITUDE || '32.7767' }}
+          SUPABASE_TEST_LONGITUDE: ${{ vars.SUPABASE_TEST_LONGITUDE || '-96.797' }}
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_USER_EMAIL: ${{ secrets.SUPABASE_TEST_USER_EMAIL }}
+          SUPABASE_TEST_USER_PASSWORD: ${{ secrets.SUPABASE_TEST_USER_PASSWORD }}
