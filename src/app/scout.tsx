@@ -288,6 +288,8 @@ export default function ScoutScreen() {
   const [appliedRouteGameId, setAppliedRouteGameId] = useState<string | null>(null);
   const [appliedRouteVenueId, setAppliedRouteVenueId] = useState<string | null>(null);
   const gameSearchInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const latestScrollYRef = useRef(0);
 
   const filteredVenues = useMemo(() => {
     const normalizedQuery = venueQuery.trim().toLowerCase();
@@ -743,6 +745,18 @@ export default function ScoutScreen() {
     }, 50);
   }
 
+  function restoreScrollPosition(scrollY: number) {
+    latestScrollYRef.current = scrollY;
+
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ animated: false, y: scrollY });
+    });
+
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ animated: false, y: scrollY });
+    }, 80);
+  }
+
   function addQuickNote(note: string) {
     setNotes((currentNotes) => {
       const trimmedNotes = currentNotes.trim();
@@ -760,12 +774,15 @@ export default function ScoutScreen() {
   }
 
   async function approveReport(reportId: string) {
+    const scrollYBeforeAction = latestScrollYRef.current;
+
     setActiveModerationReportId(reportId);
     setQueueMessage(null);
 
     try {
       const result = await approveScoutInventoryReport(reportId);
       await refreshPendingReports();
+      restoreScrollPosition(scrollYBeforeAction);
       setQueueMessage(
         result
           ? `Report approved. Live inventory now reflects ${result.resultingAvailabilityStatus} with qty ${result.resultingQuantity}.`
@@ -781,12 +798,15 @@ export default function ScoutScreen() {
   }
 
   async function rejectReport(reportId: string) {
+    const scrollYBeforeAction = latestScrollYRef.current;
+
     setActiveModerationReportId(reportId);
     setQueueMessage(null);
 
     try {
       await rejectScoutInventoryReport(reportId);
       await refreshPendingReports();
+      restoreScrollPosition(scrollYBeforeAction);
       setQueueMessage('Report rejected and removed from the pending queue.');
     } catch {
       setQueueMessage(
@@ -798,12 +818,15 @@ export default function ScoutScreen() {
   }
 
   async function approveVenueReviewItem(submissionId: string) {
+    const scrollYBeforeAction = latestScrollYRef.current;
+
     setActiveModerationSubmissionId(submissionId);
     setQueueMessage(null);
 
     try {
       const result = await approveVenueSubmission(submissionId);
       await Promise.all([refreshPendingReports(), refreshScoutVenues()]);
+      restoreScrollPosition(scrollYBeforeAction);
       setQueueMessage(
         result
           ? `Venue approved: ${result.createdVenueName}.`
@@ -817,12 +840,15 @@ export default function ScoutScreen() {
   }
 
   async function rejectVenueReviewItem(submissionId: string) {
+    const scrollYBeforeAction = latestScrollYRef.current;
+
     setActiveModerationSubmissionId(submissionId);
     setQueueMessage(null);
 
     try {
       await rejectVenueSubmission(submissionId);
       await refreshPendingReports();
+      restoreScrollPosition(scrollYBeforeAction);
       setQueueMessage('Venue submission rejected.');
     } catch {
       setQueueMessage('Venue rejection failed. Confirm you are signed in as admin.');
@@ -832,12 +858,15 @@ export default function ScoutScreen() {
   }
 
   async function approveGameReviewItem(submissionId: string) {
+    const scrollYBeforeAction = latestScrollYRef.current;
+
     setActiveModerationSubmissionId(submissionId);
     setQueueMessage(null);
 
     try {
       const result = await approveGameSubmission(submissionId);
       await refreshPendingReports();
+      restoreScrollPosition(scrollYBeforeAction);
       setQueueMessage(
         result
           ? `Game approved: ${result.createdGameTitle}.`
@@ -851,12 +880,15 @@ export default function ScoutScreen() {
   }
 
   async function rejectGameReviewItem(submissionId: string) {
+    const scrollYBeforeAction = latestScrollYRef.current;
+
     setActiveModerationSubmissionId(submissionId);
     setQueueMessage(null);
 
     try {
       await rejectGameSubmission(submissionId);
       await refreshPendingReports();
+      restoreScrollPosition(scrollYBeforeAction);
       setQueueMessage('Game submission rejected.');
     } catch {
       setQueueMessage('Game rejection failed. Confirm you are signed in as admin.');
@@ -1200,6 +1232,11 @@ export default function ScoutScreen() {
           styles.content,
           isWideLayout && styles.contentWide,
         ]}
+        onScroll={(event) => {
+          latestScrollYRef.current = event.nativeEvent.contentOffset.y;
+        }}
+        ref={scrollViewRef}
+        scrollEventThrottle={16}
       >
         <View style={styles.hero}>
           <View style={styles.heroGlow} />
