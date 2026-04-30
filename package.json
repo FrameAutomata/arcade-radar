@@ -13,7 +13,8 @@
     "test:ci": "vitest run --coverage=false",
     "test:integration": "vitest run --coverage=false --config vitest.integration.config.ts",
     "check": "npm run typecheck && npm run test:ci",
-    "build:web": "npx expo export --platform web"
+    "build:web": "npx expo export --platform web",
+    "seed:mame": "node scripts/build-mame-game-seed.mjs"
   },
   "dependencies": {
     "@maplibre/maplibre-react-native": "^11.0.1",

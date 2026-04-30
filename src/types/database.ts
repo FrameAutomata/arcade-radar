@@ -22,6 +22,8 @@ export interface Database {
           release_year: number | null;
           aliases: string[];
           categories: string[];
+          external_ids: Record<string, unknown>;
+          metadata: Record<string, unknown>;
           created_at: string;
           updated_at: string;
         };
@@ -33,6 +35,8 @@ export interface Database {
           release_year?: number | null;
           aliases?: string[];
           categories?: string[];
+          external_ids?: Record<string, unknown>;
+          metadata?: Record<string, unknown>;
           created_at?: string;
           updated_at?: string;
         };
@@ -43,6 +47,8 @@ export interface Database {
           release_year?: number | null;
           aliases?: string[];
           categories?: string[];
+          external_ids?: Record<string, unknown>;
+          metadata?: Record<string, unknown>;
           updated_at?: string;
         };
       };
