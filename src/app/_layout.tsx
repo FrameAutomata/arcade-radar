@@ -1,33 +1,51 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { AuthProvider } from "@/lib/auth-context";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 60_000,
+    },
+  },
+});
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          animation: "slide_from_right",
-          contentStyle: { backgroundColor: theme.colors.background },
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: theme.colors.backgroundElevated },
-          headerTintColor: theme.colors.textPrimary,
-          headerTitleStyle: {
-            color: theme.colors.textPrimary,
-            fontSize: 18,
-            fontWeight: "700",
-          },
-        }}
-      >
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="demo" options={{ title: "Demo" }} />
-        <Stack.Screen name="auth" options={{ title: "Account" }} />
-        <Stack.Screen name="scout" options={{ title: "Scout mode" }} />
-        <Stack.Screen name="venue/[id]" options={{ title: "Venue details" }} />
-      </Stack>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <SafeAreaProvider>
+            <StatusBar style="light" />
+            <Stack
+              screenOptions={{
+                animation: "slide_from_right",
+                contentStyle: { backgroundColor: theme.colors.background },
+                headerShadowVisible: false,
+                headerStyle: { backgroundColor: theme.colors.backgroundElevated },
+                headerTintColor: theme.colors.textPrimary,
+                headerTitleStyle: {
+                  color: theme.colors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: "700",
+                },
+              }}
+            >
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="demo" options={{ title: "Demo" }} />
+              <Stack.Screen name="auth" options={{ title: "Account" }} />
+              <Stack.Screen name="scout" options={{ title: "Scout mode" }} />
+              <Stack.Screen name="venue/[id]" options={{ title: "Venue details" }} />
+            </Stack>
+          </SafeAreaProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

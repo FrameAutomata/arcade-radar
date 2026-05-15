@@ -106,9 +106,11 @@ export function ResultCard({ result, selected = false }: ResultCardProps) {
               {result.venue.inventory.length} tracked game
               {result.venue.inventory.length === 1 ? "" : "s"}
             </Text>
-            <Text style={styles.metaText}>
-              {result.venue.verifiedByCount} community confirmations
-            </Text>
+            {result.venue.verifiedByCount !== undefined ? (
+              <Text style={styles.metaText}>
+                {result.venue.verifiedByCount} community confirmations
+              </Text>
+            ) : null}
           </View>
         )}
       </Pressable>

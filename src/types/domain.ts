@@ -31,7 +31,7 @@ export interface Venue {
   region: string;
   latitude: number;
   longitude: number;
-  verifiedByCount: number;
+  verifiedByCount?: number;
   notes?: string;
   inventory: VenueInventoryItem[];
 }

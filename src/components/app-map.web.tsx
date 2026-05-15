@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import L from "leaflet";
 import { MapContainer } from "react-leaflet/MapContainer";
 import { Marker } from "react-leaflet/Marker";
@@ -52,8 +52,12 @@ function FitToRegion({
       return;
     }
 
+    // Sync Leaflet's internal size with the DOM before any positioning call,
+    // otherwise fitBounds uses stale/zero dimensions from initial mount.
+    map.invalidateSize();
+
     if (region.latitudeDelta <= 0 || region.longitudeDelta <= 0) {
-      map.setView([region.latitude, region.longitude], 12);
+      map.setView([region.latitude, region.longitude], 12, { animate: false });
       lastAppliedSignature.current = regionSignature;
       return;
     }
@@ -72,6 +76,7 @@ function FitToRegion({
     );
 
     map.fitBounds(bounds, {
+      animate: false,
       padding: [36, 36],
     });
     lastAppliedSignature.current = regionSignature;
@@ -87,6 +92,15 @@ function FitToRegion({
   });
 
   return null;
+}
+
+function regionToBounds(region: AppMapProps["region"]): L.LatLngBoundsExpression {
+  const halfLat = region.latitudeDelta / 2;
+  const halfLng = region.longitudeDelta / 2;
+  return [
+    [region.latitude - halfLat, region.longitude - halfLng],
+    [region.latitude + halfLat, region.longitude + halfLng],
+  ];
 }
 
 export function AppMap({
@@ -110,14 +124,16 @@ export function AppMap({
     [region],
   );
 
+  const initialBounds = useMemo(() => regionToBounds(region), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <View style={styles.wrapper}>
       <View style={[styles.mapFrame, { height }]}>
         <MapContainer
-          center={[region.latitude, region.longitude]}
+          bounds={initialBounds}
+          boundsOptions={{ padding: [36, 36] }}
           scrollWheelZoom
-          style={styles.map}
-          zoom={12}
+          style={{ height, width: "100%" }}
         >
           <TileLayer
             attribution="&copy; OpenStreetMap contributors"
@@ -138,17 +154,20 @@ export function AppMap({
               position={[pin.coordinate.latitude, pin.coordinate.longitude]}
             >
               <Popup>
-                <View style={styles.popupContent}>
+                <Pressable
+                  onPress={() => onPinPress?.(pin.id)}
+                  style={styles.popupContent}
+                >
                   <Text style={styles.popupTitle}>{pin.title}</Text>
                   {selectedPinId === pin.id ? (
-                    <Text style={styles.popupSelected}>Selected arcade</Text>
+                    <Text style={styles.popupSelected}>Click for directions</Text>
                   ) : null}
                   {pin.description ? (
                     <Text style={styles.popupDescription}>
                       {pin.description}
                     </Text>
                   ) : null}
-                </View>
+                </Pressable>
               </Popup>
             </Marker>
           ))}
@@ -168,10 +187,6 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     borderWidth: 1,
     overflow: "hidden",
-    width: "100%",
-  },
-  map: {
-    height: "100%",
     width: "100%",
   },
   popupContent: {

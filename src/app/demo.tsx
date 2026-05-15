@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { theme } from "@/constants/theme";
+import { BREAKPOINTS, theme } from "@/constants/theme";
 import {
   buildDemoSearchParams,
   featuredDemoSearches,
@@ -36,7 +36,7 @@ const talkingPoints = [
 
 export default function DemoScreen() {
   const { width } = useWindowDimensions();
-  const isWideLayout = width >= 1100;
+  const isWideLayout = width >= BREAKPOINTS.wide;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>

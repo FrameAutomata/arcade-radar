@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { Link, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
@@ -5,8 +6,8 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
-  useState,
   startTransition,
 } from "react";
 import {
@@ -24,9 +25,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppMap } from "@/components/app-map";
 import { ResultCard } from "@/components/result-card";
-import { theme } from "@/constants/theme";
+import { BREAKPOINTS, theme } from "@/constants/theme";
 import { featuredGames as mockFeaturedGames } from "@/data/mock-data";
-import { getAuthSessionSummary, type AuthSessionSummary } from "@/lib/auth";
+import { useAuth } from "@/lib/auth-context";
 import { formatDistanceMiles } from "@/lib/format";
 import { resolveAppLocation } from "@/lib/geocoding";
 import { buildMapRegion, type Coordinates } from "@/lib/geo";
@@ -39,231 +40,184 @@ import {
 } from "@/lib/live-data";
 import { openDirections } from "@/lib/navigation";
 import { demoLocationLabel } from "@/lib/search";
-import type { Game, NearbyVenueResult } from "@/types/domain";
+import type { Game } from "@/types/domain";
 
 const DISTANCE_FILTERS_MILES = [10, 25, 50, 100, 250] as const;
 const DEFAULT_DISTANCE_FILTER_MILES = 50;
 
+// ---------------------------------------------------------------------------
+// Reducer
+// ---------------------------------------------------------------------------
+
+interface HomeState {
+  distanceFilterMiles: number;
+  isApplyingManualLocation: boolean;
+  isLocating: boolean;
+  isMapInteracting: boolean;
+  locationError: string | null;
+  locationLabel: string;
+  manualLocationQuery: string;
+  searchQuery: string;
+  selectedGame: Game | null;
+  selectedVenueId: string | null;
+  userLocation: Coordinates;
+}
+
+type HomeAction =
+  | { type: "DISTANCE_FILTER_CHANGE"; miles: number }
+  | { type: "GAME_CLEAR" }
+  | { type: "GAME_SELECT"; game: Game }
+  | { type: "LOCATING_END" }
+  | { type: "LOCATING_START" }
+  | { type: "LOCATION_ERROR"; error: string }
+  | { type: "LOCATION_SET"; coordinates: Coordinates; label: string }
+  | { type: "MANUAL_LOCATION_APPLYING_END" }
+  | { type: "MANUAL_LOCATION_APPLYING_START" }
+  | { type: "MANUAL_LOCATION_QUERY_CHANGE"; query: string }
+  | { type: "MAP_INTERACTION_CHANGE"; isInteracting: boolean }
+  | { type: "SEARCH_QUERY_CHANGE"; query: string }
+  | { type: "VENUE_SELECT"; venueId: string | null };
+
+const initialState: HomeState = {
+  distanceFilterMiles: DEFAULT_DISTANCE_FILTER_MILES,
+  isApplyingManualLocation: false,
+  isLocating: false,
+  isMapInteracting: false,
+  locationError: null,
+  locationLabel: demoLocationLabel,
+  manualLocationQuery: "",
+  searchQuery: "",
+  selectedGame: null,
+  selectedVenueId: null,
+  userLocation: defaultUserLocation,
+};
+
+function homeReducer(state: HomeState, action: HomeAction): HomeState {
+  switch (action.type) {
+    case "DISTANCE_FILTER_CHANGE":
+      return { ...state, distanceFilterMiles: action.miles };
+    case "GAME_CLEAR":
+      return { ...state, searchQuery: "", selectedGame: null };
+    case "GAME_SELECT":
+      return { ...state, searchQuery: action.game.title, selectedGame: action.game };
+    case "LOCATING_END":
+      return { ...state, isLocating: false };
+    case "LOCATING_START":
+      return { ...state, isLocating: true, locationError: null };
+    case "LOCATION_ERROR":
+      return { ...state, locationError: action.error };
+    case "LOCATION_SET":
+      return { ...state, locationError: null, locationLabel: action.label, userLocation: action.coordinates };
+    case "MANUAL_LOCATION_APPLYING_END":
+      return { ...state, isApplyingManualLocation: false };
+    case "MANUAL_LOCATION_APPLYING_START":
+      return { ...state, isApplyingManualLocation: true, locationError: null };
+    case "MANUAL_LOCATION_QUERY_CHANGE":
+      return { ...state, manualLocationQuery: action.query };
+    case "MAP_INTERACTION_CHANGE":
+      return { ...state, isMapInteracting: action.isInteracting };
+    case "SEARCH_QUERY_CHANGE":
+      return { ...state, searchQuery: action.query, selectedGame: null };
+    case "VENUE_SELECT":
+      return { ...state, selectedVenueId: action.venueId };
+    default:
+      return state;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
 export default function HomeScreen() {
-  const params = useLocalSearchParams<{
-    game?: string;
-    location?: string;
-  }>();
+  const params = useLocalSearchParams<{ game?: string; location?: string }>();
   const { width } = useWindowDimensions();
-  const isWideLayout = width >= 1100;
-  const [isMapInteracting, setIsMapInteracting] = useState(false);
-  const [userLocation, setUserLocation] =
-    useState<Coordinates>(defaultUserLocation);
-  const [locationLabel, setLocationLabel] = useState(demoLocationLabel);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-  const [manualLocationQuery, setManualLocationQuery] = useState("");
-  const [isApplyingManualLocation, setIsApplyingManualLocation] =
-    useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
-  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
-  const [distanceFilterMiles, setDistanceFilterMiles] = useState(
-    DEFAULT_DISTANCE_FILTER_MILES,
-  );
-  const [featuredGames, setFeaturedGames] = useState<Game[]>(mockFeaturedGames);
-  const [suggestions, setSuggestions] = useState<Game[]>(mockFeaturedGames);
-  const [results, setResults] = useState<NearbyVenueResult[]>([]);
-  const [resultsError, setResultsError] = useState<string | null>(null);
-  const [isLoadingResults, setIsLoadingResults] = useState(true);
-  const [authSession, setAuthSession] = useState<AuthSessionSummary | null>(null);
+  const isWideLayout = width >= BREAKPOINTS.wide;
+  const { session: authSession } = useAuth();
+  const [state, dispatch] = useReducer(homeReducer, initialState);
+  const {
+    distanceFilterMiles,
+    isApplyingManualLocation,
+    isLocating,
+    isMapInteracting,
+    locationError,
+    locationLabel,
+    manualLocationQuery,
+    searchQuery,
+    selectedGame,
+    selectedVenueId,
+    userLocation,
+  } = state;
+
   const appliedDemoParamsRef = useRef<string | null>(null);
   const deferredQuery = useDeferredValue(searchQuery);
 
-  const game = selectedGame;
-  const scoutLinkStyle = StyleSheet.flatten([
-    styles.navButton,
-    styles.navButtonSecondary,
-  ]) as ViewStyle;
-  const authLinkStyle = StyleSheet.flatten([
-    styles.navButton,
-    authSession && styles.navButtonActive,
-  ]) as ViewStyle;
-  const mapRegion = useMemo(
-    () =>
-      buildMapRegion(
-        userLocation,
-        results.map((result) => ({
-          latitude: result.venue.latitude,
-          longitude: result.venue.longitude,
-        })),
-      ),
-    [results, userLocation],
-  );
+  // ── Data queries ──────────────────────────────────────────────────────────
+
+  const { data: featuredGames = mockFeaturedGames } = useQuery<Game[]>({
+    queryFn: () => getFeaturedGamesLive(),
+    queryKey: ["featuredGames"],
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: gameSuggestions } = useQuery<Game[]>({
+    enabled: deferredQuery.trim().length > 0,
+    queryFn: () => searchGamesLive(deferredQuery.trim()),
+    queryKey: ["gameSuggestions", deferredQuery.trim()],
+  });
+
+  const {
+    data: results = [],
+    error: resultsError,
+    isFetching: isLoadingResults,
+  } = useQuery({
+    queryFn: () =>
+      selectedGame
+        ? findVenueMatchesLive(selectedGame, userLocation, distanceFilterMiles)
+        : findNearbyVenuesLive(userLocation, distanceFilterMiles),
+    queryKey: ["venueResults", selectedGame?.id ?? null, userLocation, distanceFilterMiles],
+  });
+
+  // ── One-shot: apply device GPS on mount (native only) ────────────────────
 
   useEffect(() => {
+    if (Platform.OS === "web") return;
+
     let cancelled = false;
 
-    async function loadFeaturedGames() {
+    async function applyDeviceLocation() {
       try {
-        const nextFeaturedGames = await getFeaturedGamesLive();
+        const existing = await Location.getForegroundPermissionsAsync();
+        if (existing.status !== "granted") return;
 
-        if (!cancelled && nextFeaturedGames.length > 0) {
-          setFeaturedGames(nextFeaturedGames);
-          setSuggestions((currentSuggestions) =>
-            searchQuery.trim() ? currentSuggestions : nextFeaturedGames,
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setFeaturedGames(mockFeaturedGames);
-        }
-      }
-    }
-
-    void loadFeaturedGames();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-
-      async function loadAuthSession() {
-        try {
-          const nextSession = await getAuthSessionSummary();
-
-          if (!cancelled) {
-            setAuthSession(nextSession);
-          }
-        } catch {
-          if (!cancelled) {
-            setAuthSession(null);
-          }
-        }
-      }
-
-      void loadAuthSession();
-
-      return () => {
-        cancelled = true;
-      };
-    }, []),
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function applyInitialDeviceLocation() {
-      if (Platform.OS === "web") {
-        return;
-      }
-
-      try {
-        const existingPermission = await Location.getForegroundPermissionsAsync();
-
-        if (existingPermission.status !== "granted") {
-          return;
-        }
-
-        const currentPosition = await Location.getCurrentPositionAsync({
+        const pos = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
 
         if (!cancelled) {
-          setUserLocation({
-            latitude: currentPosition.coords.latitude,
-            longitude: currentPosition.coords.longitude,
+          dispatch({
+            type: "LOCATION_SET",
+            coordinates: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+            label: "Using your current location",
           });
-          setLocationLabel("Using your current location");
         }
       } catch {
-        if (!cancelled) {
-          setLocationLabel(demoLocationLabel);
-        }
+        // silently fall back to demo location
       }
     }
 
-    void applyInitialDeviceLocation();
-
-    return () => {
-      cancelled = true;
-    };
+    void applyDeviceLocation();
+    return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSuggestions() {
-      const normalizedQuery = deferredQuery.trim();
-
-      if (!normalizedQuery) {
-        setSuggestions(featuredGames);
-        return;
-      }
-
-      try {
-        const nextSuggestions = await searchGamesLive(normalizedQuery);
-
-        if (!cancelled) {
-          setSuggestions(nextSuggestions);
-        }
-      } catch {
-        if (!cancelled) {
-          setSuggestions(featuredGames);
-        }
-      }
-    }
-
-    void loadSuggestions();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [deferredQuery, featuredGames]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadResults() {
-      setIsLoadingResults(true);
-      setResultsError(null);
-
-      try {
-        const nextResults = game
-          ? await findVenueMatchesLive(game, userLocation, distanceFilterMiles)
-          : await findNearbyVenuesLive(userLocation, distanceFilterMiles);
-
-        if (!cancelled) {
-          setResults(nextResults);
-        }
-      } catch {
-        if (!cancelled) {
-          setResults([]);
-          setResultsError(
-            "Could not load arcade data right now. Try again in a moment.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingResults(false);
-        }
-      }
-    }
-
-    void loadResults();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [distanceFilterMiles, game, userLocation]);
+  // ── Demo params ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     const paramLocation = typeof params.location === "string" ? params.location.trim() : "";
     const paramGame = typeof params.game === "string" ? params.game.trim() : "";
     const paramKey = `${paramLocation}|${paramGame}`;
 
-    if ((!paramLocation && !paramGame) || appliedDemoParamsRef.current === paramKey) {
-      return;
-    }
+    if ((!paramLocation && !paramGame) || appliedDemoParamsRef.current === paramKey) return;
 
     let cancelled = false;
 
@@ -271,190 +225,149 @@ export default function HomeScreen() {
       appliedDemoParamsRef.current = paramKey;
 
       if (paramLocation) {
-        setManualLocationQuery(paramLocation);
-        setLocationError(null);
-        setIsApplyingManualLocation(true);
+        dispatch({ type: "MANUAL_LOCATION_QUERY_CHANGE", query: paramLocation });
+        dispatch({ type: "MANUAL_LOCATION_APPLYING_START" });
 
         try {
-          const manualLocation = await resolveAppLocation(paramLocation);
-
-          if (!cancelled && manualLocation) {
-            setUserLocation(manualLocation.coordinates);
-            setLocationLabel(manualLocation.label);
-          } else if (!cancelled) {
-            setLocationError("Could not find that demo ZIP code yet.");
+          const resolved = await resolveAppLocation(paramLocation);
+          if (!cancelled) {
+            if (resolved) {
+              dispatch({ type: "LOCATION_SET", coordinates: resolved.coordinates, label: resolved.label });
+            } else {
+              dispatch({ type: "LOCATION_ERROR", error: "Could not find that demo ZIP code yet." });
+            }
           }
         } catch {
-          if (!cancelled) {
-            setLocationError("Could not apply that demo ZIP code right now.");
-          }
+          if (!cancelled) dispatch({ type: "LOCATION_ERROR", error: "Could not apply that demo ZIP code right now." });
         } finally {
-          if (!cancelled) {
-            setIsApplyingManualLocation(false);
-          }
+          if (!cancelled) dispatch({ type: "MANUAL_LOCATION_APPLYING_END" });
         }
       }
 
       if (paramGame) {
-        startTransition(() => {
-          setSearchQuery(paramGame);
-          setSelectedGame(null);
-        });
+        startTransition(() => dispatch({ type: "SEARCH_QUERY_CHANGE", query: paramGame }));
 
         try {
-          const [matchedGame] = await searchGamesLive(paramGame, 1);
-
-          if (!cancelled && matchedGame) {
-            selectGame(matchedGame);
+          const [matched] = await searchGamesLive(paramGame, 1);
+          if (!cancelled && matched) {
+            startTransition(() => dispatch({ type: "GAME_SELECT", game: matched }));
           }
         } catch {
-          if (!cancelled) {
-            setResultsError("Demo game search is not available right now.");
-          }
+          // ignore demo game search failure
         }
       }
     }
 
     void applyDemoParams();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [params.game, params.location]);
 
-  const pins = [
-    {
-      id: "user-location",
-      coordinate: userLocation,
-      isUserLocation: true,
-      title: "You are here",
-    },
-    ...results.map((result) => ({
-      id: result.venue.id,
-      coordinate: {
-        latitude: result.venue.latitude,
-        longitude: result.venue.longitude,
-      },
-      description: `${result.venue.address}, ${result.venue.city}`,
-      title: result.venue.name,
-    })),
-  ];
+  // ── Derived ───────────────────────────────────────────────────────────────
+
+  const mapRegion = useMemo(
+    () =>
+      buildMapRegion(
+        userLocation,
+        results.map((r) => ({ latitude: r.venue.latitude, longitude: r.venue.longitude })),
+      ),
+    [results, userLocation],
+  );
+
+  const pins = useMemo(
+    () => [
+      { id: "user-location", coordinate: userLocation, isUserLocation: true, title: "You are here" },
+      ...results.map((r) => ({
+        id: r.venue.id,
+        coordinate: { latitude: r.venue.latitude, longitude: r.venue.longitude },
+        description: `${r.venue.address}, ${r.venue.city}`,
+        title: r.venue.name,
+      })),
+    ],
+    [results, userLocation],
+  );
+
+  const visibleSuggestions = deferredQuery.trim() ? (gameSuggestions ?? featuredGames) : featuredGames;
+
+  const scoutLinkStyle = StyleSheet.flatten([styles.navButton, styles.navButtonSecondary]) as ViewStyle;
+  const authLinkStyle = StyleSheet.flatten([styles.navButton, authSession && styles.navButtonActive]) as ViewStyle;
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   function handlePinPress(pinId: string) {
     if (pinId === "user-location") {
-      setSelectedVenueId(null);
+      dispatch({ type: "VENUE_SELECT", venueId: null });
       return;
     }
 
-    const tappedResult = results.find((result) => result.venue.id === pinId);
-
-    if (!tappedResult) {
-      return;
-    }
+    const tapped = results.find((r) => r.venue.id === pinId);
+    if (!tapped) return;
 
     if (selectedVenueId !== pinId) {
-      setSelectedVenueId(pinId);
+      dispatch({ type: "VENUE_SELECT", venueId: pinId });
       return;
     }
 
     void openDirections({
-      address: `${tappedResult.venue.address}, ${tappedResult.venue.city}, ${tappedResult.venue.region}`,
-      destination: {
-        latitude: tappedResult.venue.latitude,
-        longitude: tappedResult.venue.longitude,
-      },
-      label: `${tappedResult.venue.name}, ${tappedResult.venue.address}, ${tappedResult.venue.city}`,
+      address: `${tapped.venue.address}, ${tapped.venue.city}, ${tapped.venue.region}`,
+      destination: { latitude: tapped.venue.latitude, longitude: tapped.venue.longitude },
+      label: `${tapped.venue.name}, ${tapped.venue.address}, ${tapped.venue.city}`,
     });
   }
 
   async function requestLocation() {
-    setIsLocating(true);
-    setLocationError(null);
+    dispatch({ type: "LOCATING_START" });
 
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
 
       if (permission.status !== "granted") {
-        setLocationError(
-          "Location access was denied. Still using the demo location.",
-        );
+        dispatch({ type: "LOCATION_ERROR", error: "Location access was denied. Still using the demo location." });
         return;
       }
 
-      const currentPosition = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      dispatch({
+        type: "LOCATION_SET",
+        coordinates: { latitude: pos.coords.latitude, longitude: pos.coords.longitude },
+        label: "Using your current location",
       });
-
-      setUserLocation({
-        latitude: currentPosition.coords.latitude,
-        longitude: currentPosition.coords.longitude,
-      });
-      setLocationLabel("Using your current location");
     } catch {
-      setLocationError(
-        "Could not read your location yet. Still using the demo location.",
-      );
+      dispatch({ type: "LOCATION_ERROR", error: "Could not read your location yet. Still using the demo location." });
     } finally {
-      setIsLocating(false);
+      dispatch({ type: "LOCATING_END" });
     }
   }
 
   async function applyManualLocation() {
-    const trimmedQuery = manualLocationQuery.trim();
+    const trimmed = manualLocationQuery.trim();
 
-    if (!trimmedQuery) {
-      setLocationError(
-        "Enter an address or ZIP code to update the search area.",
-      );
+    if (!trimmed) {
+      dispatch({ type: "LOCATION_ERROR", error: "Enter an address or ZIP code to update the search area." });
       return;
     }
 
-    setIsApplyingManualLocation(true);
-    setLocationError(null);
+    dispatch({ type: "MANUAL_LOCATION_APPLYING_START" });
 
     try {
-      const manualLocation = await resolveAppLocation(trimmedQuery);
+      const resolved = await resolveAppLocation(trimmed);
 
-      if (!manualLocation) {
-        setLocationError("Could not find that address or ZIP code yet.");
+      if (!resolved) {
+        dispatch({ type: "LOCATION_ERROR", error: "Could not find that address or ZIP code yet." });
         return;
       }
 
-      setUserLocation(manualLocation.coordinates);
-      setLocationLabel(manualLocation.label);
+      dispatch({ type: "LOCATION_SET", coordinates: resolved.coordinates, label: resolved.label });
     } finally {
-      setIsApplyingManualLocation(false);
+      dispatch({ type: "MANUAL_LOCATION_APPLYING_END" });
     }
   }
 
-  function selectGame(game: Game) {
-    startTransition(() => {
-      setSelectedGame(game);
-      setSearchQuery(game.title);
-    });
-  }
-
-  function updateSearch(value: string) {
-    startTransition(() => {
-      setSearchQuery(value);
-      setSelectedGame(null);
-    });
-  }
-
-  function clearFilter() {
-    startTransition(() => {
-      setSelectedGame(null);
-      setSearchQuery("");
-    });
-  }
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          isWideLayout && styles.contentWide,
-        ]}
+        contentContainerStyle={[styles.content, isWideLayout && styles.contentWide]}
         scrollEnabled={Platform.OS === "web" ? true : !isMapInteracting}
       >
         <View style={styles.topActions}>
@@ -483,29 +396,25 @@ export default function HomeScreen() {
               <Text style={styles.sectionTitle}>Search your area</Text>
               <Text style={styles.locationText}>{locationLabel}</Text>
             </View>
-            <Pressable
-              disabled={isLocating}
-              onPress={requestLocation}
-              style={styles.locationButton}
-            >
+            <Pressable disabled={isLocating} onPress={requestLocation} style={styles.locationButton}>
               <Text style={styles.locationButtonText}>
                 {isLocating ? "Locating..." : "Use my location"}
               </Text>
             </Pressable>
           </View>
 
-          {locationError ? (
-            <Text style={styles.warningText}>{locationError}</Text>
-          ) : null}
+          {locationError ? <Text style={styles.warningText}>{locationError}</Text> : null}
           {resultsError ? (
-            <Text style={styles.warningText}>{resultsError}</Text>
+            <Text style={styles.warningText}>
+              Could not load arcade data right now. Try again in a moment.
+            </Text>
           ) : null}
 
           <View style={styles.manualLocationWrap}>
             <TextInput
               autoCapitalize="words"
               autoCorrect={false}
-              onChangeText={setManualLocationQuery}
+              onChangeText={(q) => dispatch({ type: "MANUAL_LOCATION_QUERY_CHANGE", query: q })}
               placeholder="Enter an address or ZIP code"
               placeholderTextColor={theme.colors.textMuted}
               style={styles.input}
@@ -514,10 +423,7 @@ export default function HomeScreen() {
             <Pressable
               disabled={isApplyingManualLocation}
               onPress={applyManualLocation}
-              style={[
-                styles.secondaryButton,
-                isApplyingManualLocation && styles.secondaryButtonDisabled,
-              ]}
+              style={[styles.secondaryButton, isApplyingManualLocation && styles.secondaryButtonDisabled]}
             >
               <Text style={styles.secondaryButtonText}>
                 {isApplyingManualLocation ? "Applying..." : "Apply location"}
@@ -526,36 +432,23 @@ export default function HomeScreen() {
           </View>
 
           <Text style={styles.helperText}>
-            Try a street address or ZIP code like `60647`, `60513`, or `9415
-            Ogden Ave`.
+            Try a street address or ZIP code like `60647`, `60513`, or `9415 Ogden Ave`.
           </Text>
 
           <View style={styles.distanceFilterBlock}>
             <View style={styles.filterHeader}>
               <Text style={styles.sectionTitle}>Distance</Text>
-              <Text style={styles.distanceMeta}>
-                Within {distanceFilterMiles} mi
-              </Text>
+              <Text style={styles.distanceMeta}>Within {distanceFilterMiles} mi</Text>
             </View>
             <View style={styles.distanceChipRow}>
-              {DISTANCE_FILTERS_MILES.map((distanceMiles) => (
+              {DISTANCE_FILTERS_MILES.map((miles) => (
                 <Pressable
-                  key={distanceMiles}
-                  onPress={() => setDistanceFilterMiles(distanceMiles)}
-                  style={[
-                    styles.distanceChip,
-                    distanceFilterMiles === distanceMiles &&
-                      styles.distanceChipSelected,
-                  ]}
+                  key={miles}
+                  onPress={() => dispatch({ type: "DISTANCE_FILTER_CHANGE", miles })}
+                  style={[styles.distanceChip, distanceFilterMiles === miles && styles.distanceChipSelected]}
                 >
-                  <Text
-                    style={[
-                      styles.distanceChipText,
-                      distanceFilterMiles === distanceMiles &&
-                        styles.distanceChipTextSelected,
-                    ]}
-                  >
-                    {distanceMiles} mi
+                  <Text style={[styles.distanceChipText, distanceFilterMiles === miles && styles.distanceChipTextSelected]}>
+                    {miles} mi
                   </Text>
                 </Pressable>
               ))}
@@ -564,8 +457,8 @@ export default function HomeScreen() {
 
           <View style={styles.filterHeader}>
             <Text style={styles.sectionTitle}>Game filter</Text>
-            {game ? (
-              <Pressable onPress={clearFilter} style={styles.clearButton}>
+            {selectedGame ? (
+              <Pressable onPress={() => dispatch({ type: "GAME_CLEAR" })} style={styles.clearButton}>
                 <Text style={styles.clearButtonText}>All arcades</Text>
               </Pressable>
             ) : null}
@@ -574,7 +467,7 @@ export default function HomeScreen() {
           <TextInput
             autoCapitalize="words"
             autoCorrect={false}
-            onChangeText={updateSearch}
+            onChangeText={(q) => startTransition(() => dispatch({ type: "SEARCH_QUERY_CHANGE", query: q }))}
             placeholder="Search for a game like DDR or Marvel vs. Capcom 2"
             placeholderTextColor={theme.colors.textMuted}
             style={styles.input}
@@ -582,48 +475,31 @@ export default function HomeScreen() {
           />
 
           <View style={styles.chipRow}>
-            {(searchQuery.trim() ? suggestions : featuredGames).map(
-              (suggestion) => (
-                <Pressable
-                  key={suggestion.id}
-                  onPress={() => selectGame(suggestion)}
-                  style={[
-                    styles.chip,
-                    Platform.OS === "web" && styles.chipWeb,
-                    game?.id === suggestion.id && styles.chipSelected,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipTitle,
-                      game?.id === suggestion.id && styles.chipTitleSelected,
-                    ]}
-                  >
-                    {suggestion.title}
-                  </Text>
-                  <Text style={styles.chipMeta}>
-                    {suggestion.manufacturer} • {suggestion.releaseYear}
-                  </Text>
-                </Pressable>
-              ),
-            )}
+            {visibleSuggestions.map((suggestion) => (
+              <Pressable
+                key={suggestion.id}
+                onPress={() => startTransition(() => dispatch({ type: "GAME_SELECT", game: suggestion }))}
+                style={[
+                  styles.chip,
+                  Platform.OS === "web" && styles.chipWeb,
+                  selectedGame?.id === suggestion.id && styles.chipSelected,
+                ]}
+              >
+                <Text style={[styles.chipTitle, selectedGame?.id === suggestion.id && styles.chipTitleSelected]}>
+                  {suggestion.title}
+                </Text>
+                <Text style={styles.chipMeta}>{suggestion.manufacturer} • {suggestion.releaseYear}</Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
-        <View
-          style={[styles.resultsGrid, isWideLayout && styles.resultsGridWide]}
-        >
-          <View
-            style={[
-              styles.panel,
-              styles.mapPanel,
-              isWideLayout && styles.mapPanelWide,
-            ]}
-          >
+        <View style={[styles.resultsGrid, isWideLayout && styles.resultsGridWide]}>
+          <View style={[styles.panel, styles.mapPanel, isWideLayout && styles.mapPanelWide]}>
             <Text style={styles.sectionTitle}>Map</Text>
             <AppMap
               height={isWideLayout ? 420 : 320}
-              onMapInteractionChange={setIsMapInteracting}
+              onMapInteractionChange={(v) => dispatch({ type: "MAP_INTERACTION_CHANGE", isInteracting: v })}
               onPinPress={handlePinPress}
               pins={pins}
               region={mapRegion}
@@ -633,15 +509,11 @@ export default function HomeScreen() {
             <View style={styles.summaryRow}>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryValue}>{results.length}</Text>
-                <Text style={styles.summaryLabel}>
-                  {game ? "matching arcades" : "nearby arcades"}
-                </Text>
+                <Text style={styles.summaryLabel}>{selectedGame ? "matching arcades" : "nearby arcades"}</Text>
               </View>
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryValue}>
-                  {results[0]
-                    ? formatDistanceMiles(results[0].distanceMiles)
-                    : "--"}
+                  {results[0] ? formatDistanceMiles(results[0].distanceMiles) : "--"}
                 </Text>
                 <Text style={styles.summaryLabel}>closest distance</Text>
               </View>
@@ -650,19 +522,13 @@ export default function HomeScreen() {
             <Text style={styles.mapHint}>
               {isLoadingResults
                 ? "Loading nearby arcade data..."
-                : game
-                ? `Showing arcades within ${distanceFilterMiles} miles that have ${game.title}.`
+                : selectedGame
+                ? `Showing arcades within ${distanceFilterMiles} miles that have ${selectedGame.title}.`
                 : `Showing arcades within ${distanceFilterMiles} miles.`}
             </Text>
           </View>
 
-          <View
-            style={[
-              styles.panel,
-              styles.listPanel,
-              isWideLayout && styles.listPanelWide,
-            ]}
-          >
+          <View style={[styles.panel, styles.listPanel, isWideLayout && styles.listPanelWide]}>
             <View style={styles.listHeader}>
               <Text style={styles.sectionTitle}>Arcades</Text>
             </View>
@@ -672,16 +538,12 @@ export default function HomeScreen() {
             ) : results.length > 0 ? (
               <View style={styles.resultsList}>
                 {results.map((result) => (
-                  <ResultCard
-                    key={result.venue.id}
-                    result={result}
-                    selected={selectedVenueId === result.venue.id}
-                  />
+                  <ResultCard key={result.venue.id} result={result} selected={selectedVenueId === result.venue.id} />
                 ))}
               </View>
             ) : (
               <Text style={styles.emptyText}>
-                {game
+                {selectedGame
                   ? `No arcades currently match this game within ${distanceFilterMiles} miles of the selected location.`
                   : `No nearby arcades were found within ${distanceFilterMiles} miles of the selected location.`}
               </Text>

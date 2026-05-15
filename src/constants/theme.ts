@@ -1,3 +1,7 @@
+export const BREAKPOINTS = {
+  wide: 1100,
+} as const;
+
 export const theme = {
   colors: {
     background: '#060b16',

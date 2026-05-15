@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -10,59 +10,23 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { theme } from "@/constants/theme";
+import { BREAKPOINTS, theme } from "@/constants/theme";
 import {
-  getAuthSessionSummary,
   signInWithPassword,
-  signOutCurrentUser,
   signUpWithPassword,
-  type AuthSessionSummary,
 } from "@/lib/auth";
+import { useAuth } from "@/lib/auth-context";
 import { hasSupabaseCredentials } from "@/lib/env";
 
 export default function AuthScreen() {
   const { width } = useWindowDimensions();
-  const isWideLayout = width >= 1100;
-  const [email, setEmail] = useState("");
+  const isWideLayout = width >= BREAKPOINTS.wide;
+  const { isLoading: isLoadingSession, refresh, session, signOut } = useAuth();
+  const [email, setEmail] = useState(session?.email ?? "");
   const [password, setPassword] = useState("");
-  const [session, setSession] = useState<AuthSessionSummary | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSession() {
-      setStatusMessage(null);
-
-      try {
-        const nextSession = await getAuthSessionSummary();
-
-        if (!cancelled) {
-          setSession(nextSession);
-          setEmail(nextSession?.email ?? "");
-        }
-      } catch {
-        if (!cancelled) {
-          setStatusMessage(
-            "Could not read the current account session. Try again in a moment.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingSession(false);
-        }
-      }
-    }
-
-    void loadSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleSignIn() {
     if (!email.trim() || !password) {
@@ -75,13 +39,13 @@ export default function AuthScreen() {
 
     try {
       await signInWithPassword(email, password);
-      const nextSession = await getAuthSessionSummary();
-      setSession(nextSession);
+      await refresh();
+      const next = session;
       setPassword("");
       setStatusMessage(
-        nextSession?.role
-          ? `Signed in as ${nextSession.email} (${nextSession.role}).`
-          : `Signed in as ${nextSession?.email ?? email.trim()}, but no scout/admin role is assigned yet.`,
+        next?.role
+          ? `Signed in as ${next.email} (${next.role}).`
+          : `Signed in as ${email.trim()}, but no scout/admin role is assigned yet.`,
       );
     } catch {
       setStatusMessage("Sign-in failed. Double-check your email and password.");
@@ -92,9 +56,7 @@ export default function AuthScreen() {
 
   async function handleRegister() {
     if (!email.trim() || !password) {
-      setStatusMessage(
-        "Enter both your email and password to create an account.",
-      );
+      setStatusMessage("Enter both your email and password to create an account.");
       return;
     }
 
@@ -111,22 +73,14 @@ export default function AuthScreen() {
       setPassword("");
 
       if (!result.session) {
-        setSession(null);
-        setStatusMessage(
-          "Account created. Check your email to confirm it, then sign in.",
-        );
+        setStatusMessage("Account created. Check your email to confirm it, then sign in.");
         return;
       }
 
-      const nextSession = await getAuthSessionSummary();
-      setSession(nextSession);
-      setStatusMessage(
-        `Account created and signed in as ${result.user?.email ?? email.trim()}.`,
-      );
+      await refresh();
+      setStatusMessage(`Account created and signed in as ${result.user?.email ?? email.trim()}.`);
     } catch (error) {
-      setStatusMessage(
-        error instanceof Error ? error.message : "Registration failed.",
-      );
+      setStatusMessage(error instanceof Error ? error.message : "Registration failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -137,8 +91,7 @@ export default function AuthScreen() {
     setStatusMessage(null);
 
     try {
-      await signOutCurrentUser();
-      setSession(null);
+      await signOut();
       setPassword("");
       setStatusMessage("Signed out.");
     } catch {

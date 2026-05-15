@@ -1,5 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -13,7 +14,7 @@ import {
 } from "react-native";
 
 import { AppMap } from "@/components/app-map";
-import { theme } from "@/constants/theme";
+import { BREAKPOINTS, theme } from "@/constants/theme";
 import {
   formatVerificationAge,
   formatVerificationDate,
@@ -108,13 +109,8 @@ function getStatusTone(status: string) {
 export default function VenueDetailsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const isWideLayout = Platform.OS === "web" && width >= 1100;
+  const isWideLayout = Platform.OS === "web" && width >= BREAKPOINTS.wide;
   const params = useLocalSearchParams<{ id: string }>();
-  const [venueDetails, setVenueDetails] = useState<VenueDetailsModel | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [inventoryQuery, setInventoryQuery] = useState("");
   const [inventoryStatusFilter, setInventoryStatusFilter] =
     useState<InventoryStatusFilter>("all");
@@ -124,45 +120,15 @@ export default function VenueDetailsScreen() {
   >({});
   const [isDenseInventory, setIsDenseInventory] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadVenue() {
-      if (!params.id) {
-        setVenueDetails(null);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setLoadError(null);
-
-      try {
-        const nextVenueDetails = await getVenueDetailsLive(params.id);
-
-        if (!cancelled) {
-          setVenueDetails(nextVenueDetails);
-        }
-      } catch {
-        if (!cancelled) {
-          setVenueDetails(null);
-          setLoadError(
-            "Could not load this venue right now. Try again in a moment.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadVenue();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [params.id]);
+  const {
+    data: venueDetails = null,
+    isPending: isLoading,
+    error: loadError,
+  } = useQuery<VenueDetailsModel | null>({
+    enabled: Boolean(params.id),
+    queryFn: () => getVenueDetailsLive(params.id),
+    queryKey: ["venueDetails", params.id],
+  });
 
   const venue = venueDetails?.venue;
   const gamesById = venueDetails?.gamesById ?? {};
@@ -227,8 +193,7 @@ export default function VenueDetailsScreen() {
         <Stack.Screen options={{ title: "Venue missing" }} />
         <Text style={styles.missingTitle}>Venue not found</Text>
         <Text style={styles.missingText}>
-          {loadError ??
-            "This venue is not available right now."}
+          {loadError?.message ?? "This venue is not available right now."}
         </Text>
       </View>
     );
@@ -309,12 +274,14 @@ export default function VenueDetailsScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.metaRow}>
-            <View style={styles.metaCard}>
-              <Text style={styles.metaValue}>{venue.verifiedByCount}</Text>
-              <Text style={styles.metaLabel}>community confirmations</Text>
+          {venue.verifiedByCount !== undefined ? (
+            <View style={styles.metaRow}>
+              <View style={styles.metaCard}>
+                <Text style={styles.metaValue}>{venue.verifiedByCount}</Text>
+                <Text style={styles.metaLabel}>community confirmations</Text>
+              </View>
             </View>
-          </View>
+          ) : null}
         </View>
 
         <View style={styles.ctaPanel}>

@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { theme } from '@/constants/theme';
-import { getAuthSessionSummary } from '@/lib/auth';
+import { BREAKPOINTS, theme } from '@/constants/theme';
+import { useAuth } from '@/lib/auth-context';
 import { resolveAppLocation } from '@/lib/geocoding';
 import {
   approveGameSubmission,
@@ -21,7 +21,6 @@ import {
   approveVenueSubmission,
   createScoutGame,
   createScoutVenue,
-  getScoutSessionUser,
   getScoutErrorMessage,
   listPendingGameSubmissions,
   listMyPendingGameSubmissions,
@@ -231,7 +230,10 @@ export default function ScoutScreen() {
     venueId?: string;
   }>();
   const { width } = useWindowDimensions();
-  const isWideLayout = width >= 1100;
+  const isWideLayout = width >= BREAKPOINTS.wide;
+  const { session: authSession } = useAuth();
+  const sessionEmail = authSession?.email ?? null;
+  const sessionRole: UserRole | null = authSession?.role ?? null;
   const [venues, setVenues] = useState<ScoutVenue[]>([]);
   const [venueQuery, setVenueQuery] = useState('');
   const [selectedVenue, setSelectedVenue] = useState<ScoutVenue | null>(null);
@@ -248,8 +250,6 @@ export default function ScoutScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-  const [sessionRole, setSessionRole] = useState<UserRole | null>(null);
   const [pendingReports, setPendingReports] = useState<PendingInventoryReport[]>([]);
   const [pendingVenueSubmissions, setPendingVenueSubmissions] = useState<PendingVenueSubmission[]>([]);
   const [pendingGameSubmissions, setPendingGameSubmissions] = useState<PendingGameSubmission[]>([]);
@@ -278,6 +278,7 @@ export default function ScoutScreen() {
   const [newGameReleaseYear, setNewGameReleaseYear] = useState('');
   const [newGameAliases, setNewGameAliases] = useState('');
   const [newGameCategories, setNewGameCategories] = useState('');
+  const [newGameNotes, setNewGameNotes] = useState('');
   const [newGameMessage, setNewGameMessage] = useState<string | null>(null);
   const [isCreatingGame, setIsCreatingGame] = useState(false);
   const [isAddingGame, setIsAddingGame] = useState(false);
@@ -458,29 +459,8 @@ export default function ScoutScreen() {
         }
       }
 
-      let nextSessionRole: UserRole | null = null;
-      let nextSessionEmail: string | null = null;
-
-      try {
-        const [user, authSummary] = await Promise.all([
-          getScoutSessionUser(),
-          getAuthSessionSummary(),
-        ]);
-
-        nextSessionEmail = user?.email ?? null;
-
-        if (!cancelled) {
-          setSessionEmail(nextSessionEmail);
-          setSessionRole(authSummary?.role ?? null);
-        }
-
-        nextSessionRole = authSummary?.role ?? null;
-      } catch {
-        if (!cancelled) {
-          setSessionEmail(null);
-          setSessionRole(null);
-        }
-      }
+      const nextSessionEmail = sessionEmail;
+      const nextSessionRole = sessionRole;
 
       if (nextSessionEmail) {
         try {
@@ -545,7 +525,7 @@ export default function ScoutScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sessionEmail, sessionRole]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1131,6 +1111,7 @@ export default function ScoutScreen() {
           aliases: nextAliases,
           categories: nextCategories,
           manufacturer: newGameManufacturer,
+          notes: newGameNotes,
           releaseYear: parsedReleaseYear,
           title: newGameTitle,
         });
@@ -1145,6 +1126,7 @@ export default function ScoutScreen() {
         setNewGameReleaseYear('');
         setNewGameAliases('');
         setNewGameCategories('');
+        setNewGameNotes('');
         setNewGameMessage('Game submitted for admin review. It will appear in search after approval.');
         await refreshMyPendingItems();
         return;
@@ -1180,6 +1162,7 @@ export default function ScoutScreen() {
       setNewGameReleaseYear('');
       setNewGameAliases('');
       setNewGameCategories('');
+      setNewGameNotes('');
       setNewGameMessage(`Saved ${createdGame.title} and selected it for the next report.`);
     } catch (error) {
       const detail = getScoutErrorMessage(error);
@@ -1388,8 +1371,8 @@ export default function ScoutScreen() {
           </View>
         ) : null}
 
-        <View style={styles.grid}>
-          <View style={[styles.panel, styles.formPanel]}>
+        <View style={[styles.grid, isWideLayout && styles.gridWide]}>
+          <View style={[styles.panel, styles.formPanel, isWideLayout && styles.formPanelWide]}>
             <Text style={styles.sectionTitle}>1. Pick a venue</Text>
             <TextInput
               onChangeText={(value) => {
@@ -1667,6 +1650,16 @@ export default function ScoutScreen() {
                   style={styles.input}
                   value={newGameCategories}
                 />
+                {sessionRole !== 'admin' ? (
+                  <TextInput
+                    multiline
+                    onChangeText={setNewGameNotes}
+                    placeholder="Notes for the reviewer (optional)"
+                    placeholderTextColor={theme.colors.textMuted}
+                    style={[styles.input, styles.notesInput]}
+                    value={newGameNotes}
+                  />
+                ) : null}
                 {newGameMessage ? (
                   <Text style={styles.helperMessage}>{newGameMessage}</Text>
                 ) : null}
@@ -1775,7 +1768,7 @@ export default function ScoutScreen() {
           </View>
 
           {sessionRole === 'admin' ? (
-            <View style={[styles.panel, styles.queuePanel]}>
+            <View style={[styles.panel, styles.queuePanel, isWideLayout && styles.queuePanelWide]}>
               <View style={styles.queueHeader}>
                 <View>
                   <Text style={styles.sectionTitle}>Review queue</Text>
@@ -2100,6 +2093,17 @@ const styles = StyleSheet.create({
   },
   grid: {
     gap: theme.spacing.lg,
+  },
+  gridWide: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+  },
+  formPanelWide: {
+    flex: 1,
+  },
+  queuePanelWide: {
+    alignSelf: 'stretch',
+    flex: 1,
   },
   sessionPanel: {
     backgroundColor: 'rgba(8, 15, 30, 0.76)',
