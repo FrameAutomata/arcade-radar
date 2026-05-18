@@ -4,6 +4,23 @@ export type InventoryStatus =
   | 'temporarily_unavailable'
   | 'removed';
 
+export type VenueStatus = 'active' | 'temporarily_closed' | 'inactive';
+
+export interface VenueDayHours {
+  open: string;
+  close: string;
+}
+
+export interface VenueHours {
+  mon?: VenueDayHours;
+  tue?: VenueDayHours;
+  wed?: VenueDayHours;
+  thu?: VenueDayHours;
+  fri?: VenueDayHours;
+  sat?: VenueDayHours;
+  sun?: VenueDayHours;
+}
+
 export interface Game {
   id: string;
   slug: string;
@@ -20,6 +37,8 @@ export interface VenueInventoryItem {
   quantity: number;
   lastVerifiedAt: string;
   note?: string;
+  machineLabel?: string;
+  confidenceScore?: number;
 }
 
 export interface Venue {
@@ -29,10 +48,20 @@ export interface Venue {
   address: string;
   city: string;
   region: string;
+  postalCode?: string;
+  country?: string;
   latitude: number;
   longitude: number;
-  verifiedByCount: number;
+  status?: VenueStatus;
+  lastVerifiedAt?: string;
+  verifiedByCount?: number;
   notes?: string;
+  website?: string;
+  phone?: string;
+  entryFee?: string;
+  hours?: VenueHours;
+  facebook?: string;
+  twitter?: string;
   inventory: VenueInventoryItem[];
 }
 

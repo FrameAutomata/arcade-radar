@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { theme } from "@/constants/theme";
+import { BREAKPOINTS, theme } from "@/constants/theme";
 import {
   buildDemoSearchParams,
   featuredDemoSearches,
@@ -36,7 +36,7 @@ const talkingPoints = [
 
 export default function DemoScreen() {
   const { width } = useWindowDimensions();
-  const isWideLayout = width >= 1100;
+  const isWideLayout = width >= BREAKPOINTS.wide;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -55,12 +55,12 @@ export default function DemoScreen() {
             specific game is actually playable.
           </Text>
           <View style={styles.actionRow}>
-            <Link href="/" asChild>
+            <Link href="/(tabs)/index" asChild>
               <Pressable style={styles.primaryButton}>
                 <Text style={styles.primaryButtonText}>Open search</Text>
               </Pressable>
             </Link>
-            <Link href="/scout" asChild>
+            <Link href="/(tabs)/scout" asChild>
               <Pressable style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Scout flow</Text>
               </Pressable>
@@ -74,7 +74,7 @@ export default function DemoScreen() {
                 <Link
                   key={search.title}
                   href={{
-                    pathname: "/",
+                    pathname: "/(tabs)/index",
                     params: buildDemoSearchParams(search),
                   }}
                   asChild

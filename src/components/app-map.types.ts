@@ -19,6 +19,7 @@ export interface AppMapProps {
   pins: MapPin[];
   region: MapRegion;
   height?: number;
+  fullScreen?: boolean;
   onPinPress?: (pinId: string) => void;
   onMapInteractionChange?: (isInteracting: boolean) => void;
   selectedPinId?: string | null;

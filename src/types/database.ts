@@ -66,6 +66,13 @@ export interface Database {
           source: string;
           status: VenueStatus;
           last_verified_at: string | null;
+          phone: string | null;
+          website: string | null;
+          entry_fee: string | null;
+          hours: Record<string, unknown> | null;
+          facebook: string | null;
+          twitter: string | null;
+          description: string | null;
           metadata: Record<string, unknown>;
           created_at: string;
           updated_at: string;
@@ -83,6 +90,13 @@ export interface Database {
           source?: string;
           status?: VenueStatus;
           last_verified_at?: string | null;
+          phone?: string | null;
+          website?: string | null;
+          entry_fee?: string | null;
+          hours?: Record<string, unknown> | null;
+          facebook?: string | null;
+          twitter?: string | null;
+          description?: string | null;
           metadata?: Record<string, unknown>;
           created_at?: string;
           updated_at?: string;
@@ -99,6 +113,13 @@ export interface Database {
           source?: string;
           status?: VenueStatus;
           last_verified_at?: string | null;
+          phone?: string | null;
+          website?: string | null;
+          entry_fee?: string | null;
+          hours?: Record<string, unknown> | null;
+          facebook?: string | null;
+          twitter?: string | null;
+          description?: string | null;
           metadata?: Record<string, unknown>;
           updated_at?: string;
         };
@@ -356,6 +377,12 @@ export interface Database {
           venue_longitude?: number | null;
           venue_website?: string | null;
           venue_notes?: string | null;
+          venue_phone?: string | null;
+          venue_entry_fee?: string | null;
+          venue_hours?: Record<string, unknown> | null;
+          venue_facebook?: string | null;
+          venue_twitter?: string | null;
+          venue_description?: string | null;
         };
         Returns: {
           created_venue_id: string;
@@ -465,6 +492,13 @@ export interface Database {
           source: string;
           venue_status: VenueStatus;
           last_verified_at: string | null;
+          phone: string | null;
+          website: string | null;
+          entry_fee: string | null;
+          hours: Record<string, unknown> | null;
+          facebook: string | null;
+          twitter: string | null;
+          venue_description: string | null;
           metadata: Record<string, unknown>;
           verified_report_count: number;
           game_id: string | null;
