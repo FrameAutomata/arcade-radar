@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -1262,9 +1263,12 @@ export default function ScoutScreen() {
                 onPress={() => void refreshMyPendingItems()}
                 style={styles.secondaryButton}
               >
-                <Text style={styles.secondaryButtonText}>
-                  {isLoadingMyPendingItems ? 'Refreshing...' : 'Refresh'}
-                </Text>
+                <View style={styles.buttonRow}>
+                  <Ionicons name="refresh-outline" size={14} color={theme.colors.textPrimary} />
+                  <Text style={styles.secondaryButtonText}>
+                    {isLoadingMyPendingItems ? 'Refreshing...' : 'Refresh'}
+                  </Text>
+                </View>
               </Pressable>
             </View>
 
@@ -1299,9 +1303,12 @@ export default function ScoutScreen() {
                           activeWithdrawalId === report.reportId && styles.queueActionButtonDisabled,
                         ]}
                       >
-                        <Text style={styles.queueRejectButtonText}>
-                          {activeWithdrawalId === report.reportId ? 'Working...' : 'Withdraw'}
-                        </Text>
+                        <View style={styles.buttonRow}>
+                          <Ionicons name="remove-circle-outline" size={14} color={theme.colors.warning} />
+                          <Text style={styles.queueRejectButtonText}>
+                            {activeWithdrawalId === report.reportId ? 'Working...' : 'Withdraw'}
+                          </Text>
+                        </View>
                       </Pressable>
                     </View>
                   </View>
@@ -1327,9 +1334,12 @@ export default function ScoutScreen() {
                           activeWithdrawalId === submission.submissionId && styles.queueActionButtonDisabled,
                         ]}
                       >
-                        <Text style={styles.queueRejectButtonText}>
-                          {activeWithdrawalId === submission.submissionId ? 'Working...' : 'Withdraw'}
-                        </Text>
+                        <View style={styles.buttonRow}>
+                          <Ionicons name="remove-circle-outline" size={14} color={theme.colors.warning} />
+                          <Text style={styles.queueRejectButtonText}>
+                            {activeWithdrawalId === submission.submissionId ? 'Working...' : 'Withdraw'}
+                          </Text>
+                        </View>
                       </Pressable>
                     </View>
                   </View>
@@ -1355,9 +1365,12 @@ export default function ScoutScreen() {
                           activeWithdrawalId === submission.submissionId && styles.queueActionButtonDisabled,
                         ]}
                       >
-                        <Text style={styles.queueRejectButtonText}>
-                          {activeWithdrawalId === submission.submissionId ? 'Working...' : 'Withdraw'}
-                        </Text>
+                        <View style={styles.buttonRow}>
+                          <Ionicons name="remove-circle-outline" size={14} color={theme.colors.warning} />
+                          <Text style={styles.queueRejectButtonText}>
+                            {activeWithdrawalId === submission.submissionId ? 'Working...' : 'Withdraw'}
+                          </Text>
+                        </View>
                       </Pressable>
                     </View>
                   </View>
@@ -1393,7 +1406,10 @@ export default function ScoutScreen() {
                 </Text>
                 <View style={styles.selectionActions}>
                   <Pressable onPress={clearSelectedVenue} style={styles.ghostButton}>
-                    <Text style={styles.ghostButtonText}>Change venue</Text>
+                    <View style={styles.buttonRow}>
+                      <Ionicons name="swap-horizontal" size={12} color={theme.colors.textPrimary} />
+                      <Text style={styles.ghostButtonText}>Change venue</Text>
+                    </View>
                   </Pressable>
                 </View>
               </View>
@@ -1442,7 +1458,10 @@ export default function ScoutScreen() {
                 onPress={() => setIsAddingVenue(true)}
                 style={styles.secondaryButton}
               >
-                <Text style={styles.secondaryButtonText}>Add missing venue</Text>
+                <View style={styles.buttonRow}>
+                  <Ionicons name="add-circle-outline" size={14} color={theme.colors.textPrimary} />
+                  <Text style={styles.secondaryButtonText}>Add missing venue</Text>
+                </View>
               </Pressable>
             ) : null}
             {canContribute && !selectedVenue && isAddingVenue ? (
@@ -1450,7 +1469,10 @@ export default function ScoutScreen() {
                 <View style={styles.subPanelHeader}>
                   <Text style={styles.subPanelTitle}>Add a new venue</Text>
                   <Pressable onPress={cancelAddVenue} style={styles.ghostButton}>
-                    <Text style={styles.ghostButtonText}>Cancel</Text>
+                    <View style={styles.buttonRow}>
+                      <Ionicons name="close" size={12} color={theme.colors.textPrimary} />
+                      <Text style={styles.ghostButtonText}>Cancel</Text>
+                    </View>
                   </Pressable>
                 </View>
                 <Text style={styles.helperText}>
@@ -1520,15 +1542,22 @@ export default function ScoutScreen() {
                   onPress={() => void createVenueFromForm()}
                   style={[styles.secondaryButton, isCreatingVenue && styles.primaryButtonMuted]}
                 >
-                  <Text style={styles.secondaryButtonText}>
-                    {isCreatingVenue
-                      ? sessionRole === 'admin'
-                        ? 'Saving venue...'
-                        : 'Submitting venue...'
-                      : sessionRole === 'admin'
-                      ? 'Save new venue'
-                      : 'Submit venue for review'}
-                  </Text>
+                  <View style={styles.buttonRow}>
+                    <Ionicons
+                      name={isCreatingVenue ? 'sync' : sessionRole === 'admin' ? 'checkmark-circle-outline' : 'send-outline'}
+                      size={14}
+                      color={theme.colors.textPrimary}
+                    />
+                    <Text style={styles.secondaryButtonText}>
+                      {isCreatingVenue
+                        ? sessionRole === 'admin'
+                          ? 'Saving venue...'
+                          : 'Submitting venue...'
+                        : sessionRole === 'admin'
+                        ? 'Save new venue'
+                        : 'Submit venue for review'}
+                    </Text>
+                  </View>
                 </Pressable>
               </View>
             ) : null}
@@ -1598,7 +1627,10 @@ export default function ScoutScreen() {
                 onPress={() => setIsAddingGame(true)}
                 style={styles.secondaryButton}
               >
-                <Text style={styles.secondaryButtonText}>Add missing game</Text>
+                <View style={styles.buttonRow}>
+                  <Ionicons name="add-circle-outline" size={14} color={theme.colors.textPrimary} />
+                  <Text style={styles.secondaryButtonText}>Add missing game</Text>
+                </View>
               </Pressable>
             ) : null}
             {canContribute && !selectedGame && isAddingGame ? (
@@ -1606,7 +1638,10 @@ export default function ScoutScreen() {
                 <View style={styles.subPanelHeader}>
                   <Text style={styles.subPanelTitle}>Add a new game</Text>
                   <Pressable onPress={cancelAddGame} style={styles.ghostButton}>
-                    <Text style={styles.ghostButtonText}>Cancel</Text>
+                    <View style={styles.buttonRow}>
+                      <Ionicons name="close" size={12} color={theme.colors.textPrimary} />
+                      <Text style={styles.ghostButtonText}>Cancel</Text>
+                    </View>
                   </Pressable>
                 </View>
                 <Text style={styles.helperText}>
@@ -1668,15 +1703,22 @@ export default function ScoutScreen() {
                   onPress={() => void createGameFromForm()}
                   style={[styles.secondaryButton, isCreatingGame && styles.primaryButtonMuted]}
                 >
-                  <Text style={styles.secondaryButtonText}>
-                    {isCreatingGame
-                      ? sessionRole === 'admin'
-                        ? 'Saving game...'
-                        : 'Submitting game...'
-                      : sessionRole === 'admin'
-                      ? 'Save new game'
-                      : 'Submit game for review'}
-                  </Text>
+                  <View style={styles.buttonRow}>
+                    <Ionicons
+                      name={isCreatingGame ? 'sync' : sessionRole === 'admin' ? 'checkmark-circle-outline' : 'send-outline'}
+                      size={14}
+                      color={theme.colors.textPrimary}
+                    />
+                    <Text style={styles.secondaryButtonText}>
+                      {isCreatingGame
+                        ? sessionRole === 'admin'
+                          ? 'Saving game...'
+                          : 'Submitting game...'
+                        : sessionRole === 'admin'
+                        ? 'Save new game'
+                        : 'Submit game for review'}
+                    </Text>
+                  </View>
                 </Pressable>
               </View>
             ) : null}
@@ -1755,15 +1797,22 @@ export default function ScoutScreen() {
               onPress={() => void submitReport()}
               style={[styles.primaryButton, !canSubmitReport && styles.primaryButtonMuted]}
             >
-              <Text style={styles.primaryButtonText}>
-                {isSubmitting
-                  ? 'Submitting...'
-                  : canSubmitReport
-                  ? 'Submit scout report'
-                  : !sessionEmail
-                  ? 'Sign in to submit'
-                  : 'Pick venue and game to submit'}
-              </Text>
+              <View style={styles.buttonRow}>
+                <Ionicons
+                  name={isSubmitting ? 'sync' : 'send'}
+                  size={16}
+                  color={theme.colors.textOnBrand}
+                />
+                <Text style={styles.primaryButtonText}>
+                  {isSubmitting
+                    ? 'Submitting...'
+                    : canSubmitReport
+                    ? 'Submit scout report'
+                    : !sessionEmail
+                    ? 'Sign in to submit'
+                    : 'Pick venue and game to submit'}
+                </Text>
+              </View>
             </Pressable>
           </View>
 
@@ -1777,7 +1826,10 @@ export default function ScoutScreen() {
                   </Text>
                 </View>
                 <Pressable onPress={() => void refreshPendingReports()} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>Refresh</Text>
+                  <View style={styles.buttonRow}>
+                    <Ionicons name="refresh-outline" size={14} color={theme.colors.textPrimary} />
+                    <Text style={styles.secondaryButtonText}>Refresh</Text>
+                  </View>
                 </Pressable>
               </View>
               {queueMessage ? <Text style={styles.helperMessage}>{queueMessage}</Text> : null}
@@ -1820,9 +1872,12 @@ export default function ScoutScreen() {
                                   activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
                                 ]}
                               >
-                                <Text style={styles.queueApproveButtonText}>
-                                  {activeModerationSubmissionId === submission.submissionId ? 'Working...' : 'Approve'}
-                                </Text>
+                                <View style={styles.buttonRow}>
+                                  <Ionicons name="checkmark-circle" size={14} color={theme.colors.textOnBrand} />
+                                  <Text style={styles.queueApproveButtonText}>
+                                    {activeModerationSubmissionId === submission.submissionId ? 'Working...' : 'Approve'}
+                                  </Text>
+                                </View>
                               </Pressable>
                               <Pressable
                                 disabled={activeModerationSubmissionId === submission.submissionId}
@@ -1833,7 +1888,10 @@ export default function ScoutScreen() {
                                   activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
                                 ]}
                               >
-                                <Text style={styles.queueRejectButtonText}>Reject</Text>
+                                <View style={styles.buttonRow}>
+                                  <Ionicons name="close-circle" size={14} color={theme.colors.warning} />
+                                  <Text style={styles.queueRejectButtonText}>Reject</Text>
+                                </View>
                               </Pressable>
                             </View>
                           </View>
@@ -1882,9 +1940,12 @@ export default function ScoutScreen() {
                                   activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
                                 ]}
                               >
-                                <Text style={styles.queueApproveButtonText}>
-                                  {activeModerationSubmissionId === submission.submissionId ? 'Working...' : 'Approve'}
-                                </Text>
+                                <View style={styles.buttonRow}>
+                                  <Ionicons name="checkmark-circle" size={14} color={theme.colors.textOnBrand} />
+                                  <Text style={styles.queueApproveButtonText}>
+                                    {activeModerationSubmissionId === submission.submissionId ? 'Working...' : 'Approve'}
+                                  </Text>
+                                </View>
                               </Pressable>
                               <Pressable
                                 disabled={activeModerationSubmissionId === submission.submissionId}
@@ -1895,7 +1956,10 @@ export default function ScoutScreen() {
                                   activeModerationSubmissionId === submission.submissionId && styles.queueActionButtonDisabled,
                                 ]}
                               >
-                                <Text style={styles.queueRejectButtonText}>Reject</Text>
+                                <View style={styles.buttonRow}>
+                                  <Ionicons name="close-circle" size={14} color={theme.colors.warning} />
+                                  <Text style={styles.queueRejectButtonText}>Reject</Text>
+                                </View>
                               </Pressable>
                             </View>
                           </View>
@@ -1974,9 +2038,12 @@ export default function ScoutScreen() {
                                     activeModerationReportId === report.reportId && styles.queueActionButtonDisabled,
                                   ]}
                                 >
-                                  <Text style={styles.queueApproveButtonText}>
-                                    {activeModerationReportId === report.reportId ? 'Working...' : 'Approve'}
-                                  </Text>
+                                  <View style={styles.buttonRow}>
+                                    <Ionicons name="checkmark-circle" size={14} color={theme.colors.textOnBrand} />
+                                    <Text style={styles.queueApproveButtonText}>
+                                      {activeModerationReportId === report.reportId ? 'Working...' : 'Approve'}
+                                    </Text>
+                                  </View>
                                 </Pressable>
                                 <Pressable
                                   disabled={activeModerationReportId === report.reportId}
@@ -1987,7 +2054,10 @@ export default function ScoutScreen() {
                                     activeModerationReportId === report.reportId && styles.queueActionButtonDisabled,
                                   ]}
                                 >
-                                  <Text style={styles.queueRejectButtonText}>Reject</Text>
+                                  <View style={styles.buttonRow}>
+                                    <Ionicons name="close-circle" size={14} color={theme.colors.warning} />
+                                    <Text style={styles.queueRejectButtonText}>Reject</Text>
+                                  </View>
                                 </Pressable>
                               </View>
                             </View>
@@ -2047,21 +2117,24 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: theme.colors.brandMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
     letterSpacing: 1.8,
+    lineHeight: 12,
     textTransform: 'uppercase',
   },
   title: {
     color: theme.colors.textPrimary,
-    fontSize: 34,
-    fontWeight: '800',
-    lineHeight: 38,
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 30,
+    letterSpacing: -0.5,
+    lineHeight: 36,
   },
   description: {
     color: theme.colors.textSecondary,
-    fontSize: 16,
-    lineHeight: 24,
+    fontFamily: theme.fonts.sans,
+    fontSize: 14,
+    lineHeight: 22,
   },
   heroStats: {
     flexDirection: 'row',
@@ -2081,14 +2154,16 @@ const styles = StyleSheet.create({
   },
   heroStatValue: {
     color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 16,
+    lineHeight: 22,
   },
   heroStatLabel: {
     color: theme.colors.accentMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.0,
+    lineHeight: 12,
     textTransform: 'uppercase',
   },
   grid: {
@@ -2121,9 +2196,10 @@ const styles = StyleSheet.create({
   },
   sessionBadge: {
     color: theme.colors.brandMuted,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    lineHeight: 12,
     textTransform: 'uppercase',
   },
   sessionHistory: {
@@ -2141,12 +2217,15 @@ const styles = StyleSheet.create({
   },
   sessionHistoryTitle: {
     color: theme.colors.textPrimary,
+    fontFamily: theme.fonts.sansMedium,
     fontSize: 14,
-    fontWeight: '800',
+    lineHeight: 20,
   },
   sessionHistoryMeta: {
     color: theme.colors.textSecondary,
-    fontSize: 12,
+    fontFamily: theme.fonts.sans,
+    fontSize: 11,
+    lineHeight: 15,
   },
   panel: {
     backgroundColor: theme.colors.surfaceGlass,
@@ -2164,8 +2243,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: theme.colors.textPrimary,
+    fontFamily: theme.fonts.sansSemiBold,
     fontSize: 20,
-    fontWeight: '700',
+    letterSpacing: -0.3,
+    lineHeight: 26,
   },
   input: {
     backgroundColor: theme.colors.backgroundElevated,
@@ -2173,13 +2254,15 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     borderWidth: 1,
     color: theme.colors.textPrimary,
-    fontSize: 16,
+    fontFamily: theme.fonts.sans,
+    fontSize: 15,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 14,
   },
   helperText: {
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
     lineHeight: 18,
   },
   selectionSummary: {
@@ -2192,19 +2275,23 @@ const styles = StyleSheet.create({
   },
   selectionEyebrow: {
     color: theme.colors.accentMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.0,
+    lineHeight: 12,
     textTransform: 'uppercase',
   },
   selectionTitle: {
     color: theme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '800',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 15,
+    lineHeight: 20,
   },
   selectionMeta: {
     color: theme.colors.textSecondary,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
+    lineHeight: 16,
   },
   selectionActions: {
     alignItems: 'flex-start',
@@ -2220,36 +2307,40 @@ const styles = StyleSheet.create({
   },
   ghostButtonText: {
     color: theme.colors.textPrimary,
+    fontFamily: theme.fonts.sansSemiBold,
     fontSize: 12,
-    fontWeight: '800',
+    lineHeight: 16,
   },
   shortcutBlock: {
     gap: theme.spacing.xs,
   },
   shortcutLabel: {
     color: theme.colors.accentMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.0,
+    lineHeight: 12,
     textTransform: 'uppercase',
   },
   shortcutRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.spacing.sm,
+    gap: theme.spacing.xs,
   },
   shortcutChip: {
     backgroundColor: theme.colors.surfaceMuted,
     borderColor: theme.colors.border,
     borderRadius: 999,
     borderWidth: 1,
+    height: 30,
+    justifyContent: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
   },
   shortcutChipText: {
     color: theme.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: theme.fonts.sansMedium,
+    fontSize: 12,
+    lineHeight: 16,
   },
   subPanel: {
     backgroundColor: 'rgba(8, 15, 30, 0.66)',
@@ -2267,8 +2358,9 @@ const styles = StyleSheet.create({
   },
   subPanelTitle: {
     color: theme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontFamily: theme.fonts.sansSemiBold,
+    fontSize: 15,
+    lineHeight: 20,
   },
   inlineFields: {
     flexDirection: 'row',
@@ -2306,12 +2398,16 @@ const styles = StyleSheet.create({
   },
   selectTitle: {
     color: theme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
+    fontFamily: theme.fonts.sansSemiBold,
+    fontSize: 15,
+    letterSpacing: -0.1,
+    lineHeight: 21,
   },
   selectMeta: {
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
+    lineHeight: 16,
   },
   typeGrid: {
     gap: theme.spacing.sm,
@@ -2329,22 +2425,27 @@ const styles = StyleSheet.create({
   },
   typeChipTitle: {
     color: theme.colors.textPrimary,
+    fontFamily: theme.fonts.sansSemiBold,
     fontSize: 15,
-    fontWeight: '700',
+    letterSpacing: -0.1,
+    lineHeight: 21,
   },
   typeChipMeta: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontFamily: theme.fonts.sans,
+    fontSize: 11,
+    lineHeight: 16,
   },
   helperMessage: {
     color: theme.colors.accentMuted,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
     lineHeight: 18,
   },
   warningText: {
     color: theme.colors.warning,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
     lineHeight: 18,
   },
   duplicateWarning: {
@@ -2357,14 +2458,16 @@ const styles = StyleSheet.create({
   },
   duplicateWarningTitle: {
     color: theme.colors.warning,
-    fontSize: 13,
-    fontWeight: '900',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
     letterSpacing: 0.7,
+    lineHeight: 12,
     textTransform: 'uppercase',
   },
   duplicateWarningText: {
     color: theme.colors.textSecondary,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
     lineHeight: 18,
   },
   primaryButton: {
@@ -2379,8 +2482,9 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: theme.colors.textOnBrand,
+    fontFamily: theme.fonts.sansBold,
     fontSize: 15,
-    fontWeight: '800',
+    lineHeight: 20,
   },
   queueHeader: {
     alignItems: 'center',
@@ -2389,7 +2493,9 @@ const styles = StyleSheet.create({
   },
   queueHeaderMeta: {
     color: theme.colors.textMuted,
+    fontFamily: theme.fonts.sans,
     fontSize: 12,
+    lineHeight: 16,
     marginTop: 2,
   },
   secondaryButton: {
@@ -2403,8 +2509,9 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: theme.colors.textPrimary,
+    fontFamily: theme.fonts.sansSemiBold,
     fontSize: 13,
-    fontWeight: '700',
+    lineHeight: 18,
   },
   queueCard: {
     backgroundColor: theme.colors.surfaceMuted,
@@ -2431,14 +2538,16 @@ const styles = StyleSheet.create({
   queueVenueTitle: {
     color: theme.colors.textPrimary,
     flex: 1,
-    fontSize: 16,
-    fontWeight: '900',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 15,
+    lineHeight: 20,
   },
   queueVenueCount: {
     color: theme.colors.accentMuted,
-    fontSize: 11,
-    fontWeight: '800',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
     letterSpacing: 0.7,
+    lineHeight: 12,
     textTransform: 'uppercase',
   },
   queueCardTop: {
@@ -2449,27 +2558,34 @@ const styles = StyleSheet.create({
   queueTitle: {
     color: theme.colors.textPrimary,
     flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
+    fontFamily: theme.fonts.sansSemiBold,
+    fontSize: 15,
+    letterSpacing: -0.1,
+    lineHeight: 21,
   },
   queueTypePill: {
     borderRadius: 999,
     borderWidth: 1,
-    fontSize: 12,
-    fontWeight: '800',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.0,
+    lineHeight: 12,
+    marginLeft: theme.spacing.sm,
     overflow: 'hidden',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    marginLeft: theme.spacing.sm,
     textTransform: 'uppercase',
   },
   queueMeta: {
     color: theme.colors.textSecondary,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
+    lineHeight: 16,
   },
   queueNote: {
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
     lineHeight: 18,
   },
   queueHints: {
@@ -2483,8 +2599,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     color: theme.colors.warning,
-    fontSize: 11,
-    fontWeight: '800',
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.0,
+    lineHeight: 12,
     overflow: 'hidden',
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -2511,8 +2629,9 @@ const styles = StyleSheet.create({
   },
   queueApproveButtonText: {
     color: theme.colors.textOnBrand,
+    fontFamily: theme.fonts.sansBold,
     fontSize: 13,
-    fontWeight: '800',
+    lineHeight: 18,
   },
   queueRejectButton: {
     backgroundColor: theme.colors.surfaceMuted,
@@ -2520,12 +2639,19 @@ const styles = StyleSheet.create({
   },
   queueRejectButtonText: {
     color: theme.colors.warning,
+    fontFamily: theme.fonts.sansBold,
     fontSize: 13,
-    fontWeight: '800',
+    lineHeight: 18,
   },
   emptyText: {
     color: theme.colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: theme.fonts.sans,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  buttonRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
 });

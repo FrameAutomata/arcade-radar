@@ -4,6 +4,8 @@ import type {
   Game,
   InventoryStatus,
   NearbyVenueResult,
+  VenueDayHours,
+  VenueHours,
   VenueInventoryItem,
   VenueMatch,
 } from '@/types/domain';
@@ -120,6 +122,24 @@ export function mapVenueMatch(row: VenueMatchRow, game: Game, userLocation: Coor
   };
 }
 
+function parseHours(raw: Record<string, unknown> | null | undefined): VenueHours | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return undefined;
+  }
+  const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+  const result: VenueHours = {};
+  for (const day of days) {
+    const entry = (raw as Record<string, unknown>)[day];
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      const { open, close } = entry as Record<string, unknown>;
+      if (typeof open === 'string' && typeof close === 'string') {
+        result[day] = { open, close } satisfies VenueDayHours;
+      }
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 export function buildVenueDetailsModel(rows: VenueDetailRow[]): VenueDetailsModel | null {
   const firstRow = rows[0];
 
@@ -127,11 +147,9 @@ export function buildVenueDetailsModel(rows: VenueDetailRow[]): VenueDetailsMode
     return null;
   }
 
-  const notesValue = firstRow.metadata?.notes;
   const notes =
-    typeof notesValue === 'string' && notesValue.trim().length > 0
-      ? notesValue
-      : 'Community-maintained venue profile. Inventory and verification history will improve as more reports come in.';
+    firstRow.venue_description?.trim() ||
+    'Community-maintained venue profile. Inventory and verification history will improve as more reports come in.';
 
   const gamesById = rows.reduce<Record<string, Game>>((accumulator, row) => {
     if (!row.game_id || !row.game_title) {
@@ -152,11 +170,13 @@ export function buildVenueDetailsModel(rows: VenueDetailRow[]): VenueDetailsMode
   }, {});
 
   const inventory = rows
-    .filter((row) => row.game_id && row.quantity && row.availability_status)
+    .filter((row) => row.game_id && row.quantity !== null && row.availability_status)
     .map(
       (row): VenueInventoryItem => ({
+        confidenceScore: row.confidence_score ?? undefined,
         gameId: row.game_id!,
         lastVerifiedAt: row.last_confirmed_at ?? row.last_seen_at ?? new Date().toISOString(),
+        machineLabel: row.machine_label ?? undefined,
         note: row.notes ?? undefined,
         quantity: row.quantity!,
         status: toInventoryStatus(row.availability_status),
@@ -168,15 +188,25 @@ export function buildVenueDetailsModel(rows: VenueDetailRow[]): VenueDetailsMode
     venue: {
       address: firstRow.street_address ?? 'Address unavailable',
       city: firstRow.city,
+      country: firstRow.country,
+      entryFee: firstRow.entry_fee ?? undefined,
+      facebook: firstRow.facebook ?? undefined,
+      hours: parseHours(firstRow.hours),
       id: firstRow.venue_id,
       inventory,
+      lastVerifiedAt: firstRow.last_verified_at ?? undefined,
       latitude: firstRow.latitude,
       longitude: firstRow.longitude,
       name: firstRow.venue_name,
       notes,
+      phone: firstRow.phone ?? undefined,
+      postalCode: firstRow.postal_code ?? undefined,
       region: firstRow.region,
       slug: firstRow.venue_slug,
+      status: firstRow.venue_status,
+      twitter: firstRow.twitter ?? undefined,
       verifiedByCount: firstRow.verified_report_count,
+      website: firstRow.website ?? undefined,
     },
   };
 }

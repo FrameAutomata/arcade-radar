@@ -56,8 +56,8 @@ export function ResultCard({ result, selected = false }: ResultCardProps) {
       <Pressable style={cardStyle}>
         <View style={styles.row}>
           <View style={styles.titleWrap}>
-            <Text style={styles.title}>{result.venue.name}</Text>
-            <Text style={styles.subtitle}>
+            <Text style={styles.title} numberOfLines={2}>{result.venue.name}</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
               {result.venue.address}, {result.venue.city}
             </Text>
           </View>
@@ -68,7 +68,7 @@ export function ResultCard({ result, selected = false }: ResultCardProps) {
 
         {hasGameDetails ? (
           <>
-            <Text style={styles.gameTitle}>Has {result.game?.title}</Text>
+            <Text style={styles.gameTitle} numberOfLines={1}>Has {result.game?.title}</Text>
             <View style={styles.metaRow}>
               <View
                 style={[
@@ -148,23 +148,28 @@ const styles = StyleSheet.create({
   },
   title: {
     color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: "700",
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 16,
+    lineHeight: 22,
   },
   subtitle: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
+    lineHeight: 16,
   },
   gameTitle: {
     color: theme.colors.brandMuted,
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 0.2,
+    fontFamily: theme.fonts.sansSemiBold,
+    fontSize: 13,
+    letterSpacing: 0.1,
+    lineHeight: 18,
   },
   distance: {
     color: theme.colors.brandMuted,
-    fontSize: 15,
-    fontWeight: "700",
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 14,
+    lineHeight: 20,
   },
   metaRow: {
     alignItems: "center",
@@ -175,21 +180,25 @@ const styles = StyleSheet.create({
   badge: {
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.8,
+    fontFamily: theme.fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.0,
+    lineHeight: 12,
     textTransform: "uppercase",
   },
   metaText: {
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontFamily: theme.fonts.sans,
+    fontSize: 12,
+    lineHeight: 16,
   },
   note: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
+    fontFamily: theme.fonts.sans,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
